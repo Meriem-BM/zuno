@@ -1,4 +1,4 @@
-import type { Address, ChainId } from "./types/primitives.js";
+import type { Address, ChainId, SignerMode } from "./types/primitives.js";
 
 export interface SessionState {
   walletAddress: Address | null;
@@ -6,6 +6,7 @@ export interface SessionState {
   lastPositionId: string | null;
   lastPlanId: string | null;
   lastIntent: string | null;
+  signerMode: SignerMode | null;
 }
 
 export interface SessionStore {
@@ -20,6 +21,7 @@ const empty = (): SessionState => ({
   lastPositionId: null,
   lastPlanId: null,
   lastIntent: null,
+  signerMode: null,
 });
 
 export function createSession(initial: Partial<SessionState> = {}): SessionStore {

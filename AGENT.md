@@ -381,3 +381,36 @@ A task is done only when:
 - docs are stale after an architectural change
 - signer or execution logic became less explicit
 - a new dependency was added without a clear reason
+
+## Module cohesion and file-splitting rules
+- Do not split files too early.
+- Prefer fewer, stronger modules over many tiny files.
+- A new file must earn its existence through a real boundary of responsibility.
+- Do not create one-function-per-file structures.
+- Do not create wrapper files that add no real abstraction value.
+- Avoid architecture theater: more files does not mean better architecture.
+- For early-stage features, default to the smallest clean structure that keeps the full flow easy to read.
+- Keep the main execution flow visible in one place whenever possible.
+- Optimize first for readability, cohesion, and ease of change.
+- Split a module only when:
+  - responsibilities clearly diverge
+  - logic is reused by multiple consumers
+  - file size becomes genuinely hard to navigate
+  - testing becomes awkward because unrelated concerns are mixed
+- Before adding a new file, ask:
+  - does this improve clarity in a meaningful way
+  - is this a real boundary or just a helper extraction
+  - would the feature be easier to understand if this stayed inline
+- Prefer 1-3 files for small features unless there is a strong reason to do more.
+- Keep full pipelines easy to trace end to end.
+- Refactor into more files only after the feature proves stable and clearly grows.
+
+## Simplicity-first implementation rule
+When implementing a feature, optimize in this order:
+1. readability
+2. cohesion
+3. low file count
+4. clear data flow
+5. extensibility
+
+Do not optimize for abstract architecture too early.

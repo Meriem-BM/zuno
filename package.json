@@ -15,7 +15,8 @@
     "planner": "pnpm --filter @zuno/agents start:planner",
     "risk": "pnpm --filter @zuno/agents start:risk",
     "axl:mock": "pnpm --filter @zuno/axl mock",
-    "demo": "bash tooling/demo.sh"
+    "demo": "bash tooling/demo.sh",
+    "test:intents": "pnpm --filter @zuno/intents test"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

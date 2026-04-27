@@ -21,9 +21,17 @@ function Row({ field }: { field: Field }): React.ReactElement {
 }
 
 function intentFields(intent: Intent): Field[] {
-  const fields: Field[] = [{ key: "intent", value: intent.intent }];
+  const fields: Field[] = [
+    { key: "intent", value: intent.intent },
+    { key: "confidence", value: intent.confidence.toFixed(2) },
+  ];
   if (intent.positionId) fields.push({ key: "positionId", value: intent.positionId });
   if (intent.planId) fields.push({ key: "planId", value: intent.planId });
+  if (intent.walletAddress) fields.push({ key: "wallet", value: intent.walletAddress });
+  if (intent.amount && intent.tokenSymbol) {
+    fields.push({ key: "amount", value: `${intent.amount} ${intent.tokenSymbol}` });
+  }
+  if (intent.signerMode) fields.push({ key: "signer", value: intent.signerMode });
   return fields;
 }
 
@@ -41,6 +49,12 @@ export function IntentPanel({ intent }: IntentPanelProps): React.ReactElement {
       {intentFields(intent).map((field) => (
         <Row key={field.key} field={field} />
       ))}
+      {intent.clarification ? (
+        <Box marginTop={1}>
+          <Text color={palette.accent}>{`  ${symbols.prompt} `}</Text>
+          <Text color={palette.fg}>{intent.clarification}</Text>
+        </Box>
+      ) : null}
     </Box>
   );
 }
@@ -53,6 +67,7 @@ function sessionFields(state: SessionState): Field[] {
     { key: "chain", value: fmt(state.chainId) },
     { key: "position", value: fmt(state.lastPositionId) },
     { key: "plan", value: fmt(state.lastPlanId) },
+    { key: "signer", value: fmt(state.signerMode) },
     { key: "intent", value: fmt(state.lastIntent) },
   ];
 }

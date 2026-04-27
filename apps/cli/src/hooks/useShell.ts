@@ -1,5 +1,5 @@
 import { createSession, type SessionState } from "@zuno/core";
-import { parseIntent, type Intent } from "@zuno/intents";
+import { createModelFallback, parseIntent } from "@zuno/intents";
 import { useApp, useInput } from "ink";
 import { useCallback, useMemo, useState } from "react";
 import type { Turn } from "../types.js";
@@ -20,6 +20,7 @@ export interface Shell {
 export function useShell(): Shell {
   const { exit } = useApp();
   const session = useMemo(() => createSession(), []);
+  const fallback = useMemo(() => createModelFallback(), []);
 
   const [snapshot, setSnapshot] = useState<SessionState>(() => session.get());
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -33,24 +34,30 @@ export function useShell(): Shell {
     (value: string) => {
       const text = value.trim();
       if (!text) return;
-
-      const intent: Intent = parseIntent(text);
-      if (intent.intent === "exit") {
-        exit();
-        return;
-      }
-
-      const next = session.update({
-        lastIntent: intent.intent,
-        ...(intent.positionId ? { lastPositionId: intent.positionId } : null),
-        ...(intent.planId ? { lastPlanId: intent.planId } : null),
-      });
-
-      setSnapshot(next);
-      setTurns((prev) => [...prev, { id: prev.length, input: text, intent }]);
       setDraft("");
+
+      void (async () => {
+        const intent = await parseIntent(text, {
+          session: session.get(),
+          fallback,
+        });
+        if (intent.intent === "exit") {
+          exit();
+          return;
+        }
+
+        const next = session.update({
+          lastIntent: intent.intent,
+          ...(intent.positionId ? { lastPositionId: intent.positionId } : null),
+          ...(intent.planId ? { lastPlanId: intent.planId } : null),
+          ...(intent.signerMode ? { signerMode: intent.signerMode } : null),
+        });
+
+        setSnapshot(next);
+        setTurns((prev) => [...prev, { id: prev.length, input: text, intent }]);
+      })();
     },
-    [exit, session],
+    [exit, fallback, session],
   );
 
   return { snapshot, turns, draft, setDraft, submit };
