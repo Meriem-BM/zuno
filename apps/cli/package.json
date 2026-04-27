@@ -1,0 +1,16 @@
+{
+  "name": "@zuno/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "zuno": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@zuno/axl": "workspace:*",
+    "@zuno/core": "workspace:*",
+    "@zuno/uniswap": "workspace:*"
+  }
+}
