@@ -1,0 +1,27 @@
+{
+  "name": "zuno",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "dev": "concurrently --kill-others --names web,docs,axl,watcher,planner,risk --prefix-colors magenta,cyan,gray,yellow,blue,red \"pnpm web\" \"pnpm docs:dev\" \"pnpm axl:mock\" \"pnpm watcher\" \"pnpm planner\" \"pnpm risk\"",
+    "web": "pnpm --filter @zuno/web dev",
+    "docs:dev": "pnpm --filter @zuno/docs dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "cli": "pnpm --filter @zuno/cli start",
+    "watcher": "pnpm --filter @zuno/agents start:watcher",
+    "planner": "pnpm --filter @zuno/agents start:planner",
+    "risk": "pnpm --filter @zuno/agents start:risk",
+    "axl:mock": "pnpm --filter @zuno/axl mock",
+    "demo": "bash tooling/demo.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "concurrently": "^9.0.0",
+    "tsx": "^4.19.0",
+    "turbo": "^2.3.0",
+    "typescript": "^5.6.0"
+  }
+}
