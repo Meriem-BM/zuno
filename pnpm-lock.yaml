@@ -26,15 +26,34 @@ importers:
 
   apps/cli:
     dependencies:
-      '@zuno/axl':
-        specifier: workspace:*
-        version: link:../../packages/axl
       '@zuno/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@zuno/uniswap':
+      '@zuno/intents':
         specifier: workspace:*
-        version: link:../../packages/uniswap
+        version: link:../../packages/intents
+      '@zuno/ui-terminal':
+        specifier: workspace:*
+        version: link:../../packages/ui-terminal
+      ink:
+        specifier: ^6.3.0
+        version: 6.3.0(@types/react@19.2.14)(react@19.2.3)
+      ink-text-input:
+        specifier: ^6.0.0
+        version: 6.0.0(ink@6.3.0(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
+      react:
+        specifier: ^19.2.0
+        version: 19.2.3
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.14
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
 
   apps/docs:
     devDependencies:
@@ -133,6 +152,22 @@ importers:
       '@zuno/core':
         specifier: workspace:*
         version: link:../core
+      '@zuno/intents':
+        specifier: workspace:*
+        version: link:../intents
+      ink:
+        specifier: ^6.3.0
+        version: 6.3.0(@types/react@19.2.14)(react@19.2.3)
+      react:
+        specifier: ^19.2.0
+        version: 19.2.3
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.14
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
 
   packages/uniswap:
     dependencies:
@@ -2450,6 +2485,13 @@ packages:
     peerDependencies:
       ink: '>=4.0.0'
       react: '>=18.0.0'
+
+  ink-text-input@6.0.0:
+    resolution: {integrity: sha512-Fw64n7Yha5deb1rHY137zHTAbSTNelUKuB5Kkk2HACXEtwIHBCf9OH2tP/LQ9fRYTl1F0dZgbW0zPnZk6FA9Lw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      ink: '>=5'
+      react: '>=18'
 
   ink@6.3.0:
     resolution: {integrity: sha512-2CbJAa7XeziZYe6pDS5RVLirRY28iSGMQuEV8jRU5NQsONQNfcR/BZHHc9vkMg2lGYTHTM2pskxC1YmY28p6bQ==}
@@ -7235,6 +7277,13 @@ snapshots:
       cli-spinners: 2.9.2
       ink: 6.3.0(@types/react@19.2.14)(react@19.2.3)
       react: 19.2.3
+
+  ink-text-input@6.0.0(ink@6.3.0(@types/react@19.2.14)(react@19.2.3))(react@19.2.3):
+    dependencies:
+      chalk: 5.6.2
+      ink: 6.3.0(@types/react@19.2.14)(react@19.2.3)
+      react: 19.2.3
+      type-fest: 4.41.0
 
   ink@6.3.0(@types/react@19.2.14)(react@19.2.3):
     dependencies:

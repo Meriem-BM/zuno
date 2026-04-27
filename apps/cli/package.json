@@ -3,14 +3,23 @@
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "zuno": "./src/index.ts"
+    "zuno": "./src/index.tsx"
   },
   "scripts": {
-    "start": "tsx src/index.ts"
+    "start": "tsx src/index.tsx",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@zuno/axl": "workspace:*",
     "@zuno/core": "workspace:*",
-    "@zuno/uniswap": "workspace:*"
+    "@zuno/intents": "workspace:*",
+    "@zuno/ui-terminal": "workspace:*",
+    "ink": "^6.3.0",
+    "ink-text-input": "^6.0.0",
+    "react": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
   }
 }
