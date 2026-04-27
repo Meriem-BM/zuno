@@ -1,0 +1,38 @@
+---
+title: zuno diff
+description: Re-render a previously generated plan.
+---
+
+```
+zuno diff <planId>
+```
+
+Reads `~/.zuno/plans/<planId>.json` and re-renders the plan in the same
+format `zuno plan` produced it. Useful for:
+
+- Sharing a plan id with someone else who has Zuno installed.
+- Reviewing a plan after-the-fact without re-running the full mesh.
+- Diffing plan ids across runs (the plan id is a content hash of the
+  inputs + recommendation).
+
+## Example
+
+```
+$ zuno diff plan_dd4f9e0b6806
+
+  position    WETH / USDC 0.05%
+  range       2,190.79 to 2,421.19   out of range
+  ...
+```
+
+## Where plans live
+
+```
+~/.zuno/plans/
+  plan_dd4f9e0b6806.json
+  plan_4a1c0e2b9912.json
+  ...
+```
+
+Plan files are deterministic JSON, safe to commit to a private repo if
+you want to track decisions over time.

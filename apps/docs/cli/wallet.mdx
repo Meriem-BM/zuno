@@ -1,0 +1,28 @@
+---
+title: zuno wallet
+description: List positions held by a wallet.
+---
+
+```
+zuno wallet positions [owner]
+```
+
+Lists Uniswap v3 positions associated with `owner`. If `owner` is omitted,
+the configured local wallet is used (v0.1: a fixture wallet, see
+[Status](/introduction#status)).
+
+## Example
+
+```
+$ zuno wallet positions
+
+  pos_4f2a3b   WETH / USDC   0.05%   out of range
+  pos_7c91de   WETH / USDC   0.30%   in range
+  pos_a01122   ARB  / USDC   0.30%   in range
+```
+
+## Notes
+
+- Output includes a quick range indicator. Use `zuno inspect <id>` for
+  the full snapshot.
+- This command does not hit the AXL mesh, it's a direct read.

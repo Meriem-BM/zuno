@@ -1,0 +1,12 @@
+{
+  "name": "@zuno/docs",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "mintlify dev --port 3040",
+    "build": "mintlify build"
+  },
+  "devDependencies": {
+    "mintlify": "latest"
+  }
+}

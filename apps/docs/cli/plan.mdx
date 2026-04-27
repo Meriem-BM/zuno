@@ -1,0 +1,64 @@
+---
+title: zuno plan
+description: Run the full agent flow and produce a rebalance plan.
+---
+
+```
+zuno plan <positionId>
+```
+
+The headline command. Triggers the full Watcher → Planner → Risk flow over
+the AXL mesh and returns a structured, persisted plan.
+
+## What happens
+
+1. CLI sends a `flow_run` envelope to the **Watcher** peer.
+2. **Watcher** reads the position + pool tick state, sends a `flow_run`
+   to the **Planner** with the position snapshot.
+3. **Planner** generates one or two candidate rebalance ranges
+   (deterministic, see [Architecture / Agents](/architecture/agents)),
+   forwards a `flow_review` to **Risk**.
+4. **Risk** scores each candidate, vetoes any with insufficient buffer,
+   picks a winner, and emits `flow_run:done` back to the CLI peer.
+5. CLI prints the result and writes `~/.zuno/plans/<planId>.json`.
+
+The CLI shows progress events as each agent acts:
+
+```
+  ◇ watcher  read       pos_4f2a3b
+  ◇ planner  propose
+  ◇ risk     critique   2 candidates
+```
+
+## Example output
+
+```
+$ zuno plan pos_4f2a3b
+
+  position    WETH / USDC 0.05%
+  range       2,190.79 to 2,421.19   out of range
+  current     2,438.19
+
+  ────────────────────────────────────────────────────────
+
+  recommended 2,273.36 to 2,614.97   shift
+  rejected    2,361.41 to 2,519.99   tighten
+  reason      less than 36h of buffer at recent volatility
+
+  confidence  0.82  approve_with_caution
+
+  plan id     plan_dd4f9e0b6806    zuno diff plan_dd4f9e0b6806
+```
+
+## Confidence labels
+
+| label                  | meaning                                          |
+|------------------------|--------------------------------------------------|
+| `approve`              | clear win, low risk                              |
+| `approve_with_caution` | acceptable, but Risk flagged at least one note   |
+| `defer`                | no candidate cleared the threshold, wait        |
+
+## Timeout
+
+The CLI waits up to 30s for the final envelope. If the mesh is partially
+down (e.g. Risk peer not started), it exits non-zero with the missing hop.

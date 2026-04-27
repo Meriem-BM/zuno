@@ -1,0 +1,53 @@
+---
+title: AXL, the transport
+description: How Zuno talks to the Gensyn Agent eXchange Layer.
+---
+
+[Gensyn AXL](https://blog.gensyn.ai/introducing-axl/) is a peer-to-peer
+transport for agents. ed25519 peer ids, HTTP API on `localhost:9002`,
+endpoints `POST /send`, `GET /recv`, `GET /topology`.
+
+Zuno treats AXL as the only way agents talk to each other. That's a
+deliberate choice, without it, "multi-agent" is just function calls
+wearing a costume.
+
+## What ships in the box
+
+- `packages/axl/src/client.ts`: `AxlClient` with `register`, `send`,
+  `request`, `recv`, `topology`, `listen`.
+- `packages/axl/src/mock-server.ts`: a Bun HTTP server on `:9100` that
+  implements the same surface as the real Gensyn AXL daemon. Same routes,
+  same payload shapes.
+- `packages/axl/src/discovery.ts`: derives stable peer ids per role
+  (`watcher`, `planner`, `risk`, `cli`) so agents can find each other
+  without a directory service.
+
+## Real vs mock
+
+The mock relay is a development convenience. It is **not** ed25519-signed:
+peer ids are derived via `sha256(role)` and prefixed with `z`. Good
+enough to demo the topology; not real cryptography.
+
+To switch to a real `axl` daemon:
+
+```bash
+export ZUNO_AXL_URL=http://localhost:9002
+```
+
+The HTTP surface is identical, so no code changes. You will also need
+real ed25519 keypairs for each peer, that's part of the work for v0.2.
+
+## Why long-poll instead of websockets
+
+Long-poll matches what the real Gensyn AXL node does. Switching the
+transport to websockets later would be a `client.ts` change only, the
+agent code never sees the wire.
+
+## Inspecting the mesh
+
+```bash
+curl http://localhost:9100/topology | jq
+```
+
+Lists currently-registered peers and their roles. The CLI uses this on
+startup to confirm the Watcher is reachable before sending a `flow_run`.

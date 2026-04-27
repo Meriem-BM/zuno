@@ -1,0 +1,56 @@
+---
+title: The mesh
+description: How the CLI and three agents talk to each other.
+---
+
+Every Zuno component, including the CLI, is an **AXL peer**. There is no
+central orchestrator. A `plan` run is a sequence of envelopes hopping
+across the mesh.
+
+## Topology
+
+```
+                    ┌─────────┐  flow_run    ┌──────────┐
+   you ───── cli ──▶│ watcher │─────────────▶│ planner  │
+                    └─────────┘              └──────────┘
+                         ▲                        │
+                progress │                        │ flow_review
+                progress │              ┌─────────▼──────────┐
+                progress │◀─── flow_run:done ──── │   risk   │
+                         │              └────────────────────┘
+                         │
+                  axl mesh (ed25519 peer ids, /send · /recv)
+```
+
+## Why this shape
+
+A monolithic copilot has a habit of black-boxing the reasoning, it makes
+a call and tells you to trust it. By splitting the job across three
+processes that have to *communicate* their intermediate state, the
+reasoning is auditable: you can read the AXL log and see exactly what
+each agent saw and what it sent.
+
+## Envelope shape
+
+Every message between peers is an `AxlEnvelope`:
+
+```ts
+type AxlEnvelope<T = unknown> = {
+  id: string;            // ulid, used for request/response correlation
+  from: AgentRole;       // "cli" | "watcher" | "planner" | "risk"
+  to: AgentRole;
+  kind: string;          // e.g. "flow_run", "flow_review", "flow_run:done"
+  body: T;
+  ts: number;            // unix ms
+};
+```
+
+The `kind` field is the contract between agents. New agent capabilities
+mean new `kind` values, never new transport.
+
+## Inbox / poll model
+
+Peers pull from their own inbox via `GET /recv?peerId=<id>`. There are no
+push subscriptions in v0.1, the mock relay holds messages in memory and
+each peer long-polls. This matches the real Gensyn AXL surface, so the
+swap to a real daemon is a URL change.

@@ -1,0 +1,81 @@
+---
+title: Quickstart
+description: Boot the full mesh and run a plan in under a minute.
+---
+
+## Prerequisites
+
+- [Bun](https://bun.sh) 1.1+
+- macOS or Linux
+
+## Install
+
+```bash
+git clone <your-fork-url> zuno
+cd zuno
+bun install
+```
+
+## One-shot demo
+
+The fastest path: boot the full mesh and run a plan against a fixture
+position in a single command.
+
+```bash
+bun run demo
+```
+
+You'll see four log streams interleave, `[axl]`, `[watcher]`,
+`[planner]`, `[risk]`, followed by the CLI output:
+
+```
+════════════════════════════════════════════════════════════════
+  ◇ watcher  read       pos_4f2a3b
+  ◇ planner  propose
+  ◇ risk     critique   2 candidates
+  ...
+════════════════════════════════════════════════════════════════
+```
+
+Press `ctrl-c` to stop the mesh.
+
+## Manual: four terminals
+
+If you want to watch each agent independently:
+
+```bash
+# terminal 1
+bun run axl:mock      # local AXL-compatible relay on :9100
+
+# terminal 2
+bun run watcher
+
+# terminal 3
+bun run planner
+
+# terminal 4
+bun run risk
+```
+
+Then, in a fifth terminal:
+
+```bash
+bun run cli plan pos_4f2a3b
+```
+
+## Pointing at a real AXL daemon
+
+The bundled relay implements the same HTTP surface as the real Gensyn AXL
+node (`POST /send`, `GET /recv`, `GET /topology`). Switch with one env var:
+
+```bash
+export ZUNO_AXL_URL=http://localhost:9002
+```
+
+Nothing else changes.
+
+## Landing page
+
+```bash
+bun run dev    # http://localhost:3030
+```

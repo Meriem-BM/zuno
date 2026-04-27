@@ -1,0 +1,29 @@
+---
+title: Overview
+description: The four commands that make up the zuno CLI.
+---
+
+```
+zuno wallet positions [owner]
+zuno inspect <positionId>
+zuno plan    <positionId>
+zuno diff    <planId>
+```
+
+| command   | summary                                                       |
+|-----------|---------------------------------------------------------------|
+| `wallet`  | List positions the wallet (or owner) holds                    |
+| `inspect` | Print a single position's snapshot: range, current, status   |
+| `plan`    | Run the full Watcher → Planner → Risk flow and return a plan  |
+| `diff`    | Re-render a previously generated plan from `~/.zuno/plans`    |
+
+Plans are persisted to `~/.zuno/plans/<planId>.json` so `zuno diff` works
+across sessions.
+
+## Notes
+
+- The CLI is itself an AXL peer. It does not orchestrate the agents:
+  it sends a `flow_run` envelope to the Watcher and waits on its inbox
+  for progress events and a final `flow_run:done`.
+- All commands exit non-zero on agent timeout (default 30s).
+- Output is plain ANSI. No colour-stripping needed for piping.

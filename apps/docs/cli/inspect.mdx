@@ -1,0 +1,31 @@
+---
+title: zuno inspect
+description: Print a snapshot of a single position.
+---
+
+```
+zuno inspect <positionId>
+```
+
+Reads a position and prints its current state, pair, fee tier, range,
+current price, and an in-range / out-of-range flag.
+
+This is the same data the Watcher would surface to the rest of the mesh
+during a `plan`, but stops there. No proposal. No risk note. No plan id.
+
+## Example
+
+```
+$ zuno inspect pos_4f2a3b
+
+  position    WETH / USDC 0.05%
+  range       2,190.79 to 2,421.19   out of range
+  current     2,438.19
+  liquidity   3.42 WETH + 0 USDC
+```
+
+## When to use it
+
+- Before `zuno plan`, to confirm you're targeting the right position.
+- As a quick health check across many positions in a script.
+- When debugging, `inspect` only invokes the Watcher's read path.

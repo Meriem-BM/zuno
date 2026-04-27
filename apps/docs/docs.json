@@ -1,0 +1,44 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "zuno",
+  "description": "Terminal-native copilot for Uniswap LPs.",
+  "colors": {
+    "primary": "#FF8FB1",
+    "light": "#FF8FB1",
+    "dark": "#FF8FB1"
+  },
+  "appearance": {
+    "default": "dark",
+    "strict": true
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get started",
+        "pages": ["introduction", "quickstart"]
+      },
+      {
+        "group": "CLI",
+        "pages": [
+          "cli/overview",
+          "cli/wallet",
+          "cli/inspect",
+          "cli/plan",
+          "cli/diff"
+        ]
+      },
+      {
+        "group": "Architecture",
+        "pages": [
+          "architecture/mesh",
+          "architecture/agents",
+          "architecture/axl"
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "socials": {}
+  }
+}

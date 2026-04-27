@@ -1,0 +1,51 @@
+---
+title: The three agents
+description: What Watcher, Planner, and Risk each do, and don't do.
+---
+
+## Watcher
+
+**Reads.** Nothing else.
+
+Listens for `flow_run` envelopes from the CLI peer. For each one it:
+
+1. Looks up the position by id (in v0.1, from fixtures; later from chain).
+2. Reads the pool's current tick and recent observations.
+3. Builds a `PositionSnapshot`: pair, fee tier, range, current price,
+   in/out of range flag, time-since-last-touched-boundary.
+4. Forwards a `flow_run` to the Planner peer with the snapshot in `body`.
+
+The Watcher never proposes anything and never holds opinions. If the read
+fails it emits `flow_run:error` and the flow stops.
+
+## Planner
+
+**Proposes.** Two candidates, never more.
+
+Listens for `flow_run` envelopes from the Watcher. For each one it:
+
+1. Computes a recommended range using deterministic tick math,
+   centred on the current tick, width derived from recent volatility.
+2. Computes a tighter alternative: narrower band, higher fee capture,
+   higher exit risk.
+3. Forwards a `flow_review` to the Risk peer with both candidates in
+   `body.candidates`.
+
+Numbers come from `packages/uniswap`, the LLM is not in this loop. If
+you swap the model out, the proposed ranges do not change.
+
+## Risk
+
+**Critiques.** Picks a winner or defers.
+
+Listens for `flow_review` envelopes from the Planner. For each one it:
+
+1. Scores each candidate against a small set of checks: buffer-hours at
+   recent volatility, capital efficiency, slippage on the rebalance.
+2. Vetoes any candidate that fails a hard check (e.g. less than 12h buffer).
+3. Picks the highest-scoring survivor. If none survive: `defer`.
+4. Emits `flow_run:done` back to the CLI peer with the chosen plan,
+   the rejected alternatives, the reason string, and a confidence.
+
+This is also the agent that names the plan: the `planId` is a content
+hash of position id + recommendation + timestamp.

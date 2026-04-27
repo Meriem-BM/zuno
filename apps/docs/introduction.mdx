@@ -1,0 +1,63 @@
+---
+title: Introduction
+description: A terminal-native copilot for Uniswap LPs.
+---
+
+Zuno is a small, opinionated tool for people who run liquidity positions on
+Uniswap v3 and want help thinking, not a dashboard, not an autopilot.
+
+It runs in your terminal. You point it at a position, and it returns a
+structured rebalance plan with a clear reason and a confidence score.
+
+```
+$ zuno plan pos_4f2a3b
+
+  ◇ watcher  read       pos_4f2a3b
+  ◇ planner  propose
+  ◇ risk     critique   2 candidates
+  ────────────────────────────────────────────────────────
+
+  position    WETH / USDC 0.05%
+  range       2,190.79 to 2,421.19   out of range
+  current     2,438.19
+
+  ────────────────────────────────────────────────────────
+
+  recommended 2,273.36 to 2,614.97   shift
+  rejected    2,361.41 to 2,519.99   tighten
+  reason      less than 36h of buffer at recent volatility
+
+  confidence  0.82  approve_with_caution
+```
+
+## Why three agents
+
+LP management is still mostly manual. Dashboards report numbers; they don't
+explain decisions. A single monolithic assistant ends up making opaque calls
+on your behalf, _trust me, this is the right range._
+
+Zuno splits the job across three specialised agents and routes them over
+[Gensyn AXL](https://blog.gensyn.ai/introducing-axl/), the peer-to-peer
+Agent eXchange Layer:
+
+| agent       | does                                                        |
+|-------------|-------------------------------------------------------------|
+| **Watcher** | reads the LP position and pool tick state from chain        |
+| **Planner** | proposes one or two structured rebalance candidates         |
+| **Risk**    | critiques the candidates, vetoes weak ones, picks a winner  |
+
+Each agent is its own process with its own AXL peer id. They talk to each
+other directly over the mesh, there is no central orchestrator. The CLI
+is just another peer.
+
+## What's deterministic, what isn't
+
+Calculations stay deterministic in TypeScript. Tick math, range checks,
+candidate generation and risk scoring are all pure functions. The model
+only routes, synthesises and explains. It never invents numbers.
+
+## Status
+
+v0.1, fixture positions, AXL-compatible mock relay, no on-chain execution.
+The shape is real; the data is offline. `zuno apply` and live RPC reads
+land next.
