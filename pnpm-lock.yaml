@@ -32,6 +32,9 @@ importers:
       '@zuno/intents':
         specifier: workspace:*
         version: link:../../packages/intents
+      '@zuno/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
       '@zuno/ui-terminal':
         specifier: workspace:*
         version: link:../../packages/ui-terminal
@@ -114,18 +117,6 @@ importers:
 
   packages/core: {}
 
-  packages/execution:
-    dependencies:
-      '@zuno/core':
-        specifier: workspace:*
-        version: link:../core
-      '@zuno/uniswap':
-        specifier: workspace:*
-        version: link:../uniswap
-      '@zuno/wallet':
-        specifier: workspace:*
-        version: link:../wallet
-
   packages/intents:
     dependencies:
       '@zuno/core':
@@ -153,6 +144,22 @@ importers:
       '@zuno/uniswap':
         specifier: workspace:*
         version: link:../uniswap
+
+  packages/runtime:
+    dependencies:
+      '@zuno/core':
+        specifier: workspace:*
+        version: link:../core
+      '@zuno/intents':
+        specifier: workspace:*
+        version: link:../intents
+    devDependencies:
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
 
   packages/storage:
     dependencies:

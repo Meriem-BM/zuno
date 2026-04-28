@@ -1,7 +1,8 @@
 import { createSession, type SessionState } from "@zuno/core";
-import { createModelFallback, parseIntent } from "@zuno/intents";
+import { createModelFallback } from "@zuno/intents";
 import { useApp, useInput } from "ink";
 import { useCallback, useMemo, useState } from "react";
+import { runIntent } from "../shell/run-intent.js";
 import type { Turn } from "../types.js";
 
 export interface Shell {
@@ -16,6 +17,9 @@ export interface Shell {
  * Single source of truth for the interactive shell:
  * session state, turn history, draft buffer, submit pipeline,
  * and Escape-to-exit. The App component just composes the result.
+ *
+ * Per turn: parse → if shell-level (handled here), exit/render; otherwise the
+ * runtime executes and returns the new session, which we adopt verbatim.
  */
 export function useShell(): Shell {
   const { exit } = useApp();
@@ -37,24 +41,18 @@ export function useShell(): Shell {
       setDraft("");
 
       void (async () => {
-        const intent = await parseIntent(text, {
-          session: session.get(),
-          fallback,
-        });
-        if (intent.intent === "exit") {
+        const run = await runIntent(text, session.get(), fallback);
+        if (run.intent.intent === "exit") {
           exit();
           return;
         }
 
-        const next = session.update({
-          lastIntent: intent.intent,
-          ...(intent.positionId ? { lastPositionId: intent.positionId } : null),
-          ...(intent.planId ? { lastPlanId: intent.planId } : null),
-          ...(intent.signerMode ? { signerMode: intent.signerMode } : null),
-        });
-
+        const next = session.update(run.session);
         setSnapshot(next);
-        setTurns((prev) => [...prev, { id: prev.length, input: text, intent }]);
+        setTurns((prev) => [
+          ...prev,
+          { id: prev.length, input: text, intent: run.intent, result: run.result },
+        ]);
       })();
     },
     [exit, fallback, session],

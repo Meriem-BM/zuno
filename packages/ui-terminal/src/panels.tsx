@@ -4,14 +4,14 @@ import { Box, Text } from "ink";
 import React from "react";
 import { palette, symbols } from "./theme.js";
 
-interface Field {
+export interface Field {
   key: string;
   value: string;
 }
 
 const KEY_WIDTH = 12;
 
-function Row({ field }: { field: Field }): React.ReactElement {
+export function Row({ field }: { field: Field }): React.ReactElement {
   return (
     <Box>
       <Text color={palette.muted}>{`  ${field.key.padEnd(KEY_WIDTH)}`}</Text>

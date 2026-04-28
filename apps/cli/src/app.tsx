@@ -9,7 +9,8 @@ import {
 import { Box, Static, Text } from "ink";
 import TextInput from "ink-text-input";
 import React, { useMemo } from "react";
-import type { ScrollItem } from "./types.js";
+import { HelpPanel, ResultPanel } from "./shell/render-result.js";
+import type { ScrollItem, Turn } from "./types.js";
 import { useShell } from "./hooks/useShell.js";
 
 export function App(): React.ReactElement {
@@ -34,10 +35,7 @@ export function App(): React.ReactElement {
           item.kind === "welcome" ? (
             <Welcome key={item.key} />
           ) : (
-            <Box key={item.key} flexDirection="column" marginTop={1}>
-              <EchoLine text={item.turn.input} />
-              <IntentPanel intent={item.turn.intent} />
-            </Box>
+            <TurnView key={item.key} turn={item.turn} />
           )
         }
       </Static>
@@ -46,6 +44,17 @@ export function App(): React.ReactElement {
         <Text color={palette.accent}>{symbols.prompt} </Text>
         <TextInput value={draft} onChange={setDraft} onSubmit={submit} />
       </Box>
+    </Box>
+  );
+}
+
+function TurnView({ turn }: { turn: Turn }): React.ReactElement {
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <EchoLine text={turn.input} />
+      <IntentPanel intent={turn.intent} />
+      {turn.intent.intent === "help" ? <HelpPanel /> : null}
+      {turn.result ? <ResultPanel result={turn.result} /> : null}
     </Box>
   );
 }

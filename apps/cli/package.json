@@ -7,11 +7,13 @@
   },
   "scripts": {
     "start": "tsx src/index.tsx",
+    "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@zuno/core": "workspace:*",
     "@zuno/intents": "workspace:*",
+    "@zuno/runtime": "workspace:*",
     "@zuno/ui-terminal": "workspace:*",
     "ink": "^6.3.0",
     "ink-text-input": "^6.0.0",
