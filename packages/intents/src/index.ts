@@ -1,3 +1,3 @@
-export * from "./types.js";
-export * from "./parse-intent.js";
-export * from "./model-fallback.js";
+export * from "./contracts/types.js";
+export * from "./parser/parse-intent.js";
+export * from "./model/fallback.js";

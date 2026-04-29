@@ -4,7 +4,10 @@ export type IntentKind =
   | "exit"
   | "help"
   | "connect_wallet"
+  | "show_watch_target"
   | "show_balance"
+  | "create_position"
+  | "swap_tokens"
   | "list_positions"
   | "inspect_position"
   | "inspect_all_positions"
@@ -20,8 +23,20 @@ export type IntentKind =
   | "agent_status"
   | "show_peers"
   | "show_logs"
+  | "monitor_wallet"
+  | "show_alerts"
   | "unknown"
   | "needs_clarification";
+
+export type ClarificationField = "positionId" | "planId" | "signerMode";
+
+export interface PendingClarification {
+  intent: IntentKind;
+  field: ClarificationField;
+  positionId?: string;
+  planId?: string;
+  signerMode?: SignerMode;
+}
 
 export interface Entities {
   positionId?: string;
@@ -37,6 +52,9 @@ export interface Intent extends Entities {
   rawInput: string;
   confidence: number;
   clarification?: string;
+  pendingIntent?: IntentKind;
+  pendingField?: ClarificationField;
+  corrections?: string[];
 }
 
 export interface IntentScore {
@@ -51,4 +69,5 @@ export interface ModelFallback {
 export interface ParseOptions {
   session?: SessionState;
   fallback?: ModelFallback;
+  pending?: PendingClarification;
 }

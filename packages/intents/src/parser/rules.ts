@@ -1,5 +1,5 @@
 import type { SignerMode } from "@zuno/core";
-import type { Entities, Intent, IntentKind } from "./types.js";
+import type { Entities, Intent, IntentKind } from "../contracts/types.js";
 
 interface Signal {
   pattern: RegExp;
@@ -34,11 +34,15 @@ export const AMOUNT_TOKEN_PATTERN = new RegExp(
 
 export const SIGNER_PATTERNS: { signer: SignerMode; test: RegExp }[] = [
   { signer: "wallet", test: /\b(?:with|using)\s+(?:my\s+)?wallet\b|\bwallet\s+sign(?:er)?\b/iu },
-  { signer: "enclave", test: /\b(?:with|using)\s+(?:the\s+)?enclave\b|\benclave\s+sign(?:er)?\b/iu },
+  {
+    signer: "enclave",
+    test: /\b(?:with|using)\s+(?:the\s+)?enclave\b|\benclave\s+sign(?:er)?\b/iu,
+  },
 ];
 
 export const POSITION_REFS = /\b(?:this|that|the|current)\s+(?:position|one)\b|\bthis one\b/iu;
-export const PLAN_REFS = /\b(?:this|that|the|current|it)\s+plan\b|\b(?:apply|simulate|show)\s+it\b|^(?:apply|simulate|diff)\s+it\b/iu;
+export const PLAN_REFS =
+  /\b(?:this|that|the|current|it)\s+plan\b|\b(?:apply|simulate|show)\s+it\b|^(?:apply|simulate|diff)\s+it\b/iu;
 
 export const POSITION_INTENTS = new Set<IntentKind>([
   "inspect_position",
@@ -67,7 +71,11 @@ export const RULES: Rule[] = [
     signals: [
       { pattern: /^(?:help|\?|\/help)\b/iu, weight: 100 },
       { pattern: /\bwhat can (?:you|i) do\b/iu, weight: 80 },
-      { pattern: /^(?:hi|hello|hey|yo|sup|gm|good\s+(?:morning|evening|afternoon))\b/iu, weight: 75 },
+      { pattern: /\bcan i talk to you\b|\bcan we talk\b/iu, weight: 85 },
+      {
+        pattern: /^(?:hi|hello|hey|yo|sup|gm|good\s+(?:morning|evening|afternoon))\b/iu,
+        weight: 75,
+      },
     ],
   },
   {
@@ -79,11 +87,49 @@ export const RULES: Rule[] = [
     ],
   },
   {
+    intent: "show_watch_target",
+    signals: [
+      { pattern: /^(?:my\s+)?wallet\s+address$/iu, weight: 100 },
+      { pattern: /^(?:my\s+)?(?:wallet|address)$/iu, weight: 85 },
+      { pattern: /\bwhat(?:'s| is)\b.*\b(?:wallet|address)\b/iu, weight: 95 },
+      {
+        pattern:
+          /\b(?:which|what)\b.*\b(?:wallet|address)\b.*\b(?:watching|using|target|current)\b/iu,
+        weight: 95,
+      },
+      { pattern: /\b(?:current|active|watch|target)\b.*\b(?:wallet|address)\b/iu, weight: 90 },
+      { pattern: /\b(?:show|print|display)\b.*\b(?:wallet|address|watch target)\b/iu, weight: 85 },
+    ],
+  },
+  {
+    intent: "create_position",
+    signals: [
+      { pattern: /\b(?:create|open|mint|new)\b.*\b(?:lp\s+)?positions?\b/iu, weight: 95 },
+      { pattern: /\b(?:add|provide)\b.*\bliquidity\b/iu, weight: 90 },
+      { pattern: /\b(?:create|open|mint)\b.*\brange\b/iu, weight: 80 },
+    ],
+  },
+  {
+    intent: "swap_tokens",
+    signals: [
+      {
+        pattern: /\b(?:swap|trade|exchange|convert)\b.*\b(?:eth|weth|usdc|usdt|dai|wbtc)\b/iu,
+        weight: 95,
+      },
+      { pattern: /\b(?:need|want|trying)\b.*\b(?:swap|trade|exchange|convert)\b/iu, weight: 85 },
+      {
+        pattern:
+          /\b(?:eth|weth|usdc|usdt|dai|wbtc)\b.*\b(?:to|for)\b.*\b(?:eth|weth|usdc|usdt|dai|wbtc)\b/iu,
+        weight: 80,
+      },
+    ],
+  },
+  {
     intent: "show_balance",
     signals: [
       { pattern: /\bbalances?\b/iu, weight: 80 },
       { pattern: /\bhow much\b.*\bi (?:have|hold)\b/iu, weight: 70 },
-      { pattern: /\bwhat(?:'s| is)\b.*\b(?:my|in my)\s+wallet\b/iu, weight: 80 },
+      { pattern: /\bwhat(?:'s| is)\b.*\bin my\s+wallet\b/iu, weight: 80 },
       { pattern: /\bwhat(?: do)? i (?:have|hold)\b/iu, weight: 70 },
       { pattern: /\bwhat(?:'s| is) in (?:my )?wallet\b/iu, weight: 80 },
     ],
@@ -91,7 +137,10 @@ export const RULES: Rule[] = [
   {
     intent: "list_out_of_range_positions",
     signals: [
-      { pattern: /\b(?:which|what|any)\b.*\bpositions?\b.*\b(?:out of range|oor|drift(?:ing)?)\b/iu, weight: 95 },
+      {
+        pattern: /\b(?:which|what|any)\b.*\bpositions?\b.*\b(?:out of range|oor|drift(?:ing)?)\b/iu,
+        weight: 95,
+      },
       { pattern: /\bout of range\b.*\bpositions?\b/iu, weight: 85 },
     ],
   },
@@ -112,9 +161,22 @@ export const RULES: Rule[] = [
   {
     intent: "list_positions",
     signals: [
-      { pattern: /\b(?:show|list|view|see)\b.*\bpositions?\b/iu, weight: 80 },
+      { pattern: /\b(?:pasted|paste|entered|gave)\b.*\b(?:wallet|address)\b/iu, weight: 75 },
+      {
+        pattern: /\b(?:analyze|analyse|scan|review)\b.*\b(?:wallet|address|portfolio)\b/iu,
+        weight: 90,
+      },
+      { pattern: /\b(?:show|list|view|see|look at|check)\b.*\bpositions?\b/iu, weight: 80 },
+      {
+        pattern:
+          /\b(?:show|list|view|see|look at|check)?\s*(?:my\s+)?(?:lps?|lp|liquidity)\s+positions?\b/iu,
+        weight: 90,
+      },
+      { pattern: /\b(?:look at|check|see|show)\b.*\b(?:my\s+)?lps?\b/iu, weight: 90 },
       { pattern: /\bmy positions?\b/iu, weight: 70 },
       { pattern: /\bwhat positions\b/iu, weight: 60 },
+      { pattern: /\bdo i have\b.*\bpositions?\b/iu, weight: 80 },
+      { pattern: /\bany positions\b/iu, weight: 70 },
     ],
   },
   {
@@ -137,7 +199,10 @@ export const RULES: Rule[] = [
   {
     intent: "show_rebalance_options",
     signals: [
-      { pattern: /\b(?:options|alternatives|choices)\b.*\b(?:rebalance|range|position)\b/iu, weight: 90 },
+      {
+        pattern: /\b(?:options|alternatives|choices)\b.*\b(?:rebalance|range|position)\b/iu,
+        weight: 90,
+      },
       { pattern: /\bwhat (?:are )?(?:my )?options\b/iu, weight: 70 },
     ],
   },
@@ -175,6 +240,7 @@ export const RULES: Rule[] = [
     intent: "apply_plan",
     signals: [
       { pattern: /\b(?:apply|execute|run|commit)\b.*\b(?:plan|it|that|this)\b/iu, weight: 90 },
+      { pattern: /\brebalance\s+now\b/iu, weight: 90 },
       { pattern: /\bsign\s+(?:and\s+)?(?:apply|execute|send)\b/iu, weight: 90 },
       { pattern: /^apply\b/iu, weight: 75 },
     ],
@@ -182,8 +248,25 @@ export const RULES: Rule[] = [
   {
     intent: "agent_status",
     signals: [
-      { pattern: /\bagents?\b.*\b(?:status|online|health|alive|up)\b/iu, weight: 90 },
+      { pattern: /\bagents?\b.*\b(?:status|online|health|alive|up|running)\b/iu, weight: 90 },
       { pattern: /\bare the agents (?:up|online|alive|running)\b/iu, weight: 95 },
+      { pattern: /\b(?:show|list|view)\s+agents?\b/iu, weight: 85 },
+    ],
+  },
+  {
+    intent: "monitor_wallet",
+    signals: [
+      { pattern: /\b(?:watch|monitor)\b.*\b(?:wallet|positions?|portfolio)\b/iu, weight: 95 },
+      { pattern: /\b(?:start|run)\b.*\b(?:watcher|monitor)\b/iu, weight: 80 },
+      { pattern: /\bmonitoring\b.*\b(?:status|setup|config)\b/iu, weight: 75 },
+    ],
+  },
+  {
+    intent: "show_alerts",
+    signals: [
+      { pattern: /\b(?:show|list|view|read)\b.*\balerts?\b/iu, weight: 95 },
+      { pattern: /\b(?:latest|recent)\b.*\balerts?\b/iu, weight: 85 },
+      { pattern: /\bwhat\b.*\b(?:needs attention|changed)\b/iu, weight: 80 },
     ],
   },
   {
@@ -200,23 +283,110 @@ export const RULES: Rule[] = [
 ];
 
 export const REQUIRED_FIELDS: Partial<Record<IntentKind, Validator>> = {
-  inspect_position: (i) =>
-    i.positionId ? null : "Which position do you want me to inspect?",
-  recommend_rebalance: (i) =>
-    i.positionId ? null : "Which position should I look at?",
+  inspect_position: (i) => (i.positionId ? null : "Which position do you want me to inspect?"),
+  recommend_rebalance: (i) => (i.positionId ? null : "Which position should I look at?"),
   show_rebalance_options: (i) =>
     i.positionId ? null : "Which position should I show options for?",
-  check_range_status: (i) =>
-    i.positionId ? null : "Which position should I check the range for?",
-  show_diff: (i) =>
-    i.planId ? null : "Which plan would you like the diff for?",
-  simulate_plan: (i) =>
-    i.planId ? null : "Which plan should I simulate?",
-  explain_recommendation: (i) =>
-    i.planId ? null : "Which plan would you like me to explain?",
+  check_range_status: (i) => (i.positionId ? null : "Which position should I check the range for?"),
+  show_diff: (i) => (i.planId ? null : "Which plan would you like the diff for?"),
+  simulate_plan: (i) => (i.planId ? null : "Which plan should I simulate?"),
+  explain_recommendation: (i) => (i.planId ? null : "Which plan would you like me to explain?"),
   apply_plan: (i) => {
     if (!i.planId) return "Which plan would you like to apply?";
-    if (!i.signerMode) return "Sign with wallet or enclave?";
     return null;
   },
 };
+
+export const KEYWORD_VOCAB: ReadonlyArray<string> = [
+  "show",
+  "list",
+  "view",
+  "see",
+  "read",
+  "look",
+  "inspect",
+  "examine",
+  "check",
+  "scan",
+  "review",
+  "details",
+  "info",
+  "analyze",
+  "analyse",
+  "recommend",
+  "suggest",
+  "advise",
+  "rebalance",
+  "explain",
+  "create",
+  "open",
+  "mint",
+  "provide",
+  "swap",
+  "trade",
+  "exchange",
+  "convert",
+  "apply",
+  "execute",
+  "run",
+  "commit",
+  "simulate",
+  "preview",
+  "watch",
+  "monitor",
+  "monitoring",
+  "paste",
+  "pasted",
+  "entered",
+  "gave",
+  "connect",
+  "link",
+  "attach",
+  "exit",
+  "quit",
+  "bye",
+  "help",
+  "wallet",
+  "wallets",
+  "balance",
+  "balances",
+  "address",
+  "target",
+  "position",
+  "positions",
+  "plan",
+  "plans",
+  "diff",
+  "diffs",
+  "delta",
+  "changes",
+  "options",
+  "alternatives",
+  "choices",
+  "agent",
+  "agents",
+  "peer",
+  "peers",
+  "topology",
+  "log",
+  "logs",
+  "alert",
+  "alerts",
+  "activity",
+  "status",
+  "online",
+  "health",
+  "alive",
+  "running",
+  "range",
+  "risky",
+  "danger",
+  "current",
+  "still",
+  "everything",
+  "this",
+  "that",
+  "what",
+  "which",
+  "any",
+];
