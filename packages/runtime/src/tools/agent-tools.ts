@@ -1,46 +1,60 @@
-import type { ToolDefinition } from "../types.js";
-import { ok } from "./shared.js";
+import { AxlClient, shortPeer } from "@zuno/axl";
+import type { ToolDefinition } from "../contracts/types.js";
+import { err, ok } from "./shared.js";
 
 const showAgentStatus: ToolDefinition = {
   name: "showAgentStatus",
   intents: ["agent_status"],
-  execute: () =>
-    ok("showAgentStatus", "All 3 agents online.", {
-      watcher: { status: "online", lastSeen: Date.now() },
-      planner: { status: "online", lastSeen: Date.now() },
-      risk: { status: "online", lastSeen: Date.now() },
-    }),
+  execute: async () => {
+    try {
+      const peers = await new AxlClient({ role: "cli" }).topology();
+      const roles = new Set(peers.peers.map((peer) => peer.role));
+      return ok("showAgentStatus", "Agent topology loaded.", {
+        watcher: { status: roles.has("watcher") ? "online" : "offline" },
+        planner: { status: roles.has("planner") ? "online" : "offline" },
+        risk: { status: roles.has("risk") ? "online" : "offline" },
+      });
+    } catch (error) {
+      return err(
+        "showAgentStatus",
+        "CHAIN_READ_FAILED",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  },
 };
 
 const showPeers: ToolDefinition = {
   name: "showPeers",
   intents: ["show_peers"],
-  execute: () =>
-    ok("showPeers", "4 peers connected.", {
-      peers: [
-        { peerId: "z3f4a…b201", role: "cli" },
-        { peerId: "z9d2c…a102", role: "watcher" },
-        { peerId: "z7e1b…c903", role: "planner" },
-        { peerId: "z4a8d…d804", role: "risk" },
-      ],
-    }),
+  execute: async () => {
+    try {
+      const topology = await new AxlClient({ role: "cli" }).topology();
+      return ok("showPeers", `${topology.peers.length} peers connected.`, {
+        peers: topology.peers.map((peer) => ({
+          peerId: shortPeer(peer.peerId),
+          role: peer.role,
+        })),
+      });
+    } catch (error) {
+      return err(
+        "showPeers",
+        "CHAIN_READ_FAILED",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  },
 };
 
 const showLogs: ToolDefinition = {
   name: "showLogs",
   intents: ["show_logs"],
   execute: () =>
-    ok("showLogs", "Recent log entries.", {
-      lines: [
-        "watcher  online  peer=z9d2c…",
-        "planner  online  peer=z7e1b…",
-        "risk     online  peer=z4a8d…",
-      ],
-    }),
+    err(
+      "showLogs",
+      "EXECUTION_NOT_AVAILABLE",
+      "Agent log streaming is not configured. Use your AXL node or process supervisor logs.",
+    ),
 };
 
-export const AGENT_TOOLS: readonly ToolDefinition[] = [
-  showAgentStatus,
-  showPeers,
-  showLogs,
-];
+export const AGENT_TOOLS: readonly ToolDefinition[] = [showAgentStatus, showPeers, showLogs];

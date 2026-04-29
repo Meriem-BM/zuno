@@ -12,8 +12,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@zuno/axl": "workspace:*",
+    "@zuno/config": "workspace:*",
     "@zuno/core": "workspace:*",
-    "@zuno/intents": "workspace:*"
+    "@zuno/execution": "workspace:*",
+    "@zuno/intents": "workspace:*",
+    "@zuno/planner": "workspace:*",
+    "@zuno/storage": "workspace:*",
+    "@zuno/uniswap": "workspace:*"
   },
   "devDependencies": {
     "tsx": "^4.19.0",

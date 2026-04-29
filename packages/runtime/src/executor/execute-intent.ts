@@ -1,12 +1,14 @@
 import type { SessionState } from "@zuno/core";
 import type { Intent, IntentKind } from "@zuno/intents";
+import { defaultAlertStore, defaultPlanStore } from "@zuno/storage";
 import type {
   ConnectWalletData,
   ExecutionContext,
   ExecutorOutcome,
   RecommendRebalanceData,
+  ShowWatchTargetData,
   ToolExecutionResult,
-} from "./types.js";
+} from "../contracts/types.js";
 
 const NON_ACTIONABLE: ReadonlySet<IntentKind> = new Set<IntentKind>([
   "exit",
@@ -15,14 +17,15 @@ const NON_ACTIONABLE: ReadonlySet<IntentKind> = new Set<IntentKind>([
   "needs_clarification",
 ]);
 
-/**
- * Pipeline: validate intent is actionable → look up tool → execute →
- * structure errors → centralize session updates on success.
- */
 export async function executeIntent(
   intent: Intent,
   context: ExecutionContext,
 ): Promise<ExecutorOutcome> {
+  const executionContext: ExecutionContext = {
+    ...context,
+    planStore: context.planStore ?? defaultPlanStore(),
+    alertStore: context.alertStore ?? defaultAlertStore(),
+  };
   if (NON_ACTIONABLE.has(intent.intent)) {
     return {
       result: {
@@ -31,11 +34,11 @@ export async function executeIntent(
         message: `Intent '${intent.intent}' is handled by the shell, not the executor.`,
         errorCode: "INTENT_NOT_ACTIONABLE",
       },
-      session: context.session,
+      session: executionContext.session,
     };
   }
 
-  const tool = context.tools.find((t) => t.intents.includes(intent.intent));
+  const tool = executionContext.tools.find((t) => t.intents.includes(intent.intent));
   if (!tool) {
     return {
       result: {
@@ -44,13 +47,13 @@ export async function executeIntent(
         message: `No tool mapped for intent '${intent.intent}'.`,
         errorCode: "TOOL_NOT_MAPPED",
       },
-      session: context.session,
+      session: executionContext.session,
     };
   }
 
   let result: ToolExecutionResult;
   try {
-    result = await tool.execute(intent, context);
+    result = await tool.execute(intent, executionContext);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     result = {
@@ -64,16 +67,20 @@ export async function executeIntent(
   const session =
     result.status === "success"
       ? applySessionUpdate(intent, result, context.session)
-      : context.session;
+      : applyNonSuccessSessionUpdate(intent, executionContext.session);
 
   return { result, session };
 }
 
-/**
- * Single source of truth for session writes. Always sets `lastIntent`. Tools
- * that produce a wallet connection or a new plan have their data folded back
- * into the session here, never inside the tool itself.
- */
+function applyNonSuccessSessionUpdate(intent: Intent, session: SessionState): SessionState {
+  if (!intent.walletAddress) return session;
+  return {
+    ...session,
+    watchAddress: intent.walletAddress as SessionState["watchAddress"],
+    lastIntent: intent.intent,
+  };
+}
+
 function applySessionUpdate(
   intent: Intent,
   result: ToolExecutionResult,
@@ -83,12 +90,20 @@ function applySessionUpdate(
 
   if (intent.positionId) patch.lastPositionId = intent.positionId;
   if (intent.planId) patch.lastPlanId = intent.planId;
+  if (intent.walletAddress)
+    patch.watchAddress = intent.walletAddress as SessionState["watchAddress"];
   if (intent.signerMode) patch.signerMode = intent.signerMode;
 
   if (result.tool === "connectWallet" && isConnectWalletData(result.data)) {
-    patch.walletAddress = result.data.walletAddress;
+    patch.watchAddress = result.data.watchAddress;
+    if (result.data.walletAddress) patch.walletAddress = result.data.walletAddress;
     patch.chainId = result.data.chainId;
-    patch.signerMode = result.data.signerMode;
+    if (result.data.signerMode) patch.signerMode = result.data.signerMode;
+  }
+
+  if (isReadTargetData(result.data)) {
+    patch.watchAddress = result.data.watchAddress;
+    patch.chainId = result.data.chainId;
   }
 
   if (result.tool === "recommendRebalance" && isRecommendRebalanceData(result.data)) {
@@ -99,12 +114,19 @@ function applySessionUpdate(
 }
 
 function isConnectWalletData(data: unknown): data is ConnectWalletData {
+  return typeof data === "object" && data !== null && "watchAddress" in data && "chainId" in data;
+}
+
+function isReadTargetData(
+  data: unknown,
+): data is Pick<ShowWatchTargetData, "watchAddress" | "chainId"> {
   return (
-    typeof data === "object"
-    && data !== null
-    && "walletAddress" in data
-    && "chainId" in data
-    && "signerMode" in data
+    typeof data === "object" &&
+    data !== null &&
+    "watchAddress" in data &&
+    "chainId" in data &&
+    (data as { watchAddress?: unknown }).watchAddress !== null &&
+    (data as { chainId?: unknown }).chainId !== null
   );
 }
 
