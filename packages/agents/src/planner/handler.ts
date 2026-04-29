@@ -1,9 +1,9 @@
 import type { AxlClient } from "@zuno/axl";
 import type { AxlEnvelope, PlanCandidate, PositionSnapshot } from "@zuno/core";
 import { newRequestId } from "@zuno/core";
-import type { Logger } from "../log.js";
-import { emitProgress } from "../progress.js";
-import { proposeCandidates } from "./candidates.js";
+import { proposeCandidates } from "@zuno/planner";
+import type { Logger } from "../shared/log.js";
+import { emitProgress } from "../shared/progress.js";
 
 interface ProposePayload {
   requestId: string;

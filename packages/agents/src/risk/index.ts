@@ -1,5 +1,5 @@
 import { AxlClient } from "@zuno/axl";
-import { makeLogger } from "../log.js";
+import { makeLogger } from "../shared/log.js";
 import { handleFlowReview } from "./handler.js";
 
 const log = makeLogger("risk");

@@ -1,10 +1,5 @@
+import type { AxlClient } from "@zuno/axl";
 import type { AgentRole, AxlEnvelope } from "@zuno/core";
-import { AxlClient } from "@zuno/axl";
-
-/**
- * Emit a progress event back to the CLI peer. CLI subscribes to its own
- * inbox and renders these as "spinner lines" while the flow runs.
- */
 export async function emitProgress(
   client: AxlClient,
   requestId: string,

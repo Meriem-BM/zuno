@@ -2,8 +2,8 @@ import type { AxlClient } from "@zuno/axl";
 import type { AxlEnvelope, InspectRequest, PositionSnapshot } from "@zuno/core";
 import { newRequestId } from "@zuno/core";
 import { buildSnapshot, getPosition } from "@zuno/uniswap";
-import type { Logger } from "../log.js";
-import { emitProgress } from "../progress.js";
+import type { Logger } from "../shared/log.js";
+import { emitProgress } from "../shared/progress.js";
 
 export async function handleFlowRun(
   client: AxlClient,
@@ -15,7 +15,10 @@ export async function handleFlowRun(
 
   await emitProgress(client, env.requestId, "watcher", "watcher.read", req.positionId);
 
-  const position = await getPosition(req.positionId);
+  const position = await getPosition(req.positionId, {
+    owner: req.owner,
+    chainId: req.chainId,
+  });
   const snapshot = buildSnapshot(position);
   log(
     `snapshot  inRange=${snapshot.range.inRange}  ` +

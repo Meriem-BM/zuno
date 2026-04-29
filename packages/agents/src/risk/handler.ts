@@ -1,9 +1,9 @@
 import type { AxlClient } from "@zuno/axl";
 import type { AxlEnvelope, Plan, PlanCandidate, PositionSnapshot } from "@zuno/core";
 import { newPlanId } from "@zuno/core";
-import type { Logger } from "../log.js";
-import { emitProgress } from "../progress.js";
-import { critique } from "./critique.js";
+import { critiqueWithContext, loadRiskContext } from "@zuno/planner";
+import type { Logger } from "../shared/log.js";
+import { emitProgress } from "../shared/progress.js";
 
 interface ReviewPayload {
   requestId: string;
@@ -19,15 +19,24 @@ export async function handleFlowReview(
   const { requestId: flowId, snapshot, candidates } = env.payload as ReviewPayload;
   log(`review  flow=${flowId.slice(0, 10)}  candidates=${candidates.length}`);
 
+  const context = await loadRiskContext(snapshot);
+  log(
+    `context  vol=${context.realizedVolBps}bps  travel24h=${context.tickTravel24h}t  gas=${context.gasGwei.toFixed(2)}gwei  yield24h=$${context.feeYield24hUsd.toFixed(2)}  source=${context.source}`,
+  );
+
   await emitProgress(
     client,
     flowId,
     "risk",
     "risk.critique",
-    `${candidates.length} candidates`,
+    `${candidates.length} candidates · vol ${context.realizedVolBps}bps · gas ${context.gasGwei.toFixed(2)}gwei`,
   );
 
-  const { recommended, rejected, rejectReason, risk } = critique(snapshot, candidates);
+  const { recommended, rejected, rejectReason, risk } = critiqueWithContext(
+    snapshot,
+    candidates,
+    context,
+  );
 
   const plan: Plan = {
     id: newPlanId(),
@@ -43,6 +52,7 @@ export async function handleFlowReview(
   log(
     `verdict  ${risk.verdict}  conf=${risk.confidence.toFixed(2)}  recommended=${recommended.kind}`,
   );
+  if (rejectReason) log(`reject   ${rejectReason}`);
 
   const finalEnv: AxlEnvelope<Plan> = {
     requestId: flowId,
