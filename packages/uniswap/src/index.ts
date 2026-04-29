@@ -1,4 +1,3 @@
-export * from "./tick-math.js";
-export * from "./fixtures.js";
-export * from "./positions.js";
-export * from "./format.js";
+export * from "./math/tick-math.js";
+export * from "./positions/index.js";
+export * from "./format/index.js";

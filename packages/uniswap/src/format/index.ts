@@ -1,19 +1,11 @@
 /** Human-readable token amount given raw integer string and decimals. */
-export function formatAmount(
-  raw: string,
-  decimals: number,
-  precision = 4,
-): string {
+export function formatAmount(raw: string, decimals: number, precision = 4): string {
   if (raw === "0") return "0";
   const n = BigInt(raw);
   const base = 10n ** BigInt(decimals);
   const whole = n / base;
   const frac = n % base;
-  const fracStr = frac
-    .toString()
-    .padStart(decimals, "0")
-    .slice(0, precision)
-    .replace(/0+$/, "");
+  const fracStr = frac.toString().padStart(decimals, "0").slice(0, precision).replace(/0+$/, "");
   return fracStr.length > 0 ? `${whole.toString()}.${fracStr}` : whole.toString();
 }
 
