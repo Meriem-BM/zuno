@@ -1,21 +1,15 @@
 export function Architecture() {
   return (
-    <section
-      id="architecture"
-      className="mx-auto w-full max-w-6xl px-8 py-32 sm:py-40"
-    >
+    <section id="architecture" className="mx-auto w-full max-w-6xl px-8 py-32 sm:py-40">
       <div className="mb-16 flex items-baseline justify-between">
-        <h2 className="font-[family-name:var(--font-fraunces)] text-[34px] tracking-[-0.02em] text-[var(--color-fg)] sm:text-[42px]">
+        <h2 className="font-fraunces text-[34px] text-fg sm:text-[42px]">
           A small{" "}
-          <em
-            className="italic text-[var(--color-fg-2)]"
-            style={{ fontStyle: "italic" }}
-          >
+          <em className="italic text-fg-2" style={{ fontStyle: "italic" }}>
             mesh,
           </em>{" "}
           not a monolith.
         </h2>
-        <span className="hidden font-[family-name:var(--font-jetbrains)] text-[11px] uppercase tracking-[0.2em] text-[var(--color-muted)] sm:block">
+        <span className="hidden font-jetbrains text-[11px] uppercase text-muted sm:block">
           §3, figure
         </span>
       </div>
@@ -25,27 +19,26 @@ export function Architecture() {
           <Diagram />
         </div>
         <div className="lg:col-span-5">
-          <p className="text-[15.5px] leading-[1.7] text-[var(--color-fg-2)]">
+          <p className="text-[15.5px] leading-[1.7] text-fg-2">
             Each agent runs as its own process and connects to its own{" "}
-            <span className="text-[var(--color-fg)]">AXL</span> node, Gensyn's
-            peer-to-peer Agent eXchange Layer. They reach each other by ed25519
-            peer id over an encrypted overlay, with no central broker in the
-            path.
+            <span className="text-fg">AXL</span> node, Gensyn&apos;s peer-to-peer
+            Agent eXchange Layer. They reach each other by ed25519 peer id over an encrypted
+            overlay, with no central broker in the path.
           </p>
-          <p className="mt-6 text-[15.5px] leading-[1.7] text-[var(--color-fg-2)]">
-            The CLI is just another peer. Calculations stay deterministic in
-            TypeScript; the model only routes, synthesises, and explains.
+          <p className="mt-6 text-[15.5px] leading-[1.7] text-fg-2">
+            The CLI is just another peer. Calculations stay deterministic in TypeScript; the model
+            only routes, synthesises, and explains.
           </p>
 
-          <dl className="mt-10 grid grid-cols-2 gap-y-3 font-[family-name:var(--font-jetbrains)] text-[11.5px]">
-            <dt className="text-[var(--color-muted)]">transport</dt>
-            <dd className="text-[var(--color-fg)]">axl /send · /recv</dd>
-            <dt className="text-[var(--color-muted)]">topology</dt>
-            <dd className="text-[var(--color-fg)]">peer mesh, 4 nodes</dd>
-            <dt className="text-[var(--color-muted)]">addressing</dt>
-            <dd className="text-[var(--color-fg)]">ed25519 peer id</dd>
-            <dt className="text-[var(--color-muted)]">determinism</dt>
-            <dd className="text-[var(--color-fg)]">tick math in ts</dd>
+          <dl className="mt-10 grid grid-cols-2 gap-y-3 font-jetbrains text-[11.5px]">
+            <dt className="text-muted">transport</dt>
+            <dd className="text-fg">axl /send · /recv</dd>
+            <dt className="text-muted">topology</dt>
+            <dd className="text-fg">peer mesh, 4 nodes</dd>
+            <dt className="text-muted">addressing</dt>
+            <dd className="text-fg">ed25519 peer id</dd>
+            <dt className="text-muted">determinism</dt>
+            <dd className="text-fg">tick math in ts</dd>
           </dl>
         </div>
       </div>
@@ -86,7 +79,7 @@ function Diagram() {
   const ax = [axl(cliX), axl(wX), axl(pX), axl(rX)];
 
   return (
-    <figure className="rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] p-6">
+    <figure className="rounded-md border border-line bg-bg-2 p-6">
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="w-full"
@@ -239,7 +232,7 @@ function Diagram() {
                   fill="none"
                   stroke="var(--color-line)"
                   strokeWidth="1"
-                />
+                />,
               );
             }
           }

@@ -21,21 +21,15 @@ const items = [
 
 export function HowItWorks() {
   return (
-    <section
-      id="how"
-      className="mx-auto w-full max-w-6xl px-8 py-32 sm:py-40"
-    >
+    <section id="how" className="mx-auto w-full max-w-6xl px-8 py-32 sm:py-40">
       <div className="mb-20 flex items-baseline justify-between">
-        <h2 className="font-[family-name:var(--font-fraunces)] text-[34px] tracking-[-0.02em] text-[var(--color-fg)] sm:text-[42px]">
+        <h2 className="font-fraunces text-[34px] text-fg sm:text-[42px]">
           Three agents.{" "}
-          <em
-            className="italic text-[var(--color-fg-2)]"
-            style={{ fontStyle: "italic" }}
-          >
+          <em className="italic text-fg-2" style={{ fontStyle: "italic" }}>
             One plan.
           </em>
         </h2>
-        <span className="hidden font-[family-name:var(--font-jetbrains)] text-[11px] uppercase tracking-[0.2em] text-[var(--color-muted)] sm:block">
+        <span className="hidden font-jetbrains text-[11px] uppercase text-muted sm:block">
           §1, flow
         </span>
       </div>
@@ -45,23 +39,21 @@ export function HowItWorks() {
           <div
             key={it.no}
             className={`relative ${
-              i > 0
-                ? "sm:border-l sm:border-[var(--color-line)] sm:pl-10"
-                : "sm:pr-10"
+              i > 0 ? "sm:border-l sm:border-line sm:pl-10" : "sm:pr-10"
             } ${i < items.length - 1 ? "sm:pr-10" : ""}`}
           >
             <div className="flex items-baseline gap-3">
-              <span className="font-[family-name:var(--font-jetbrains)] text-[11px] text-[var(--color-muted)]">
+              <span className="font-jetbrains text-[11px] text-muted">
                 {it.no}
               </span>
-              <h3 className="font-[family-name:var(--font-fraunces)] text-[22px] text-[var(--color-fg)]">
+              <h3 className="font-fraunces text-[22px] text-fg">
                 {it.name}
               </h3>
-              <span className="font-[family-name:var(--font-jetbrains)] text-[11px] text-[var(--color-pink)]">
+              <span className="font-jetbrains text-[11px] text-pink">
                 {it.role}
               </span>
             </div>
-            <p className="mt-5 max-w-[280px] text-[14.5px] leading-[1.65] text-[var(--color-fg-2)]">
+            <p className="mt-5 max-w-[280px] text-[14.5px] leading-[1.65] text-fg-2">
               {it.body}
             </p>
           </div>
