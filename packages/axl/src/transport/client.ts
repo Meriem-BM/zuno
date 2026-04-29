@@ -1,8 +1,7 @@
 import type { AgentRole, AxlEnvelope } from "@zuno/core";
-import { ROLE_PEERS } from "./discovery.js";
+import { peerIdFor } from "./discovery.js";
 
 export interface AxlClientOptions {
-  /** Base URL of this peer's local AXL node. Real default: http://localhost:9002 */
   baseUrl?: string;
   role: AgentRole | "cli";
   pollIntervalMs?: number;
@@ -10,11 +9,6 @@ export interface AxlClientOptions {
 
 export type AxlHandler = (env: AxlEnvelope) => Promise<unknown> | unknown;
 
-/**
- * HTTP surface mirrors real Gensyn AXL (POST /send · GET /recv · GET /topology),
- * so the same client works against the bundled mock or a real `axl` node on
- * localhost:9002 without changes.
- */
 export class AxlClient {
   readonly peerId: string;
   readonly role: AgentRole | "cli";
@@ -24,12 +18,11 @@ export class AxlClient {
 
   constructor(opts: AxlClientOptions) {
     this.role = opts.role;
-    this.baseUrl = opts.baseUrl ?? process.env.ZUNO_AXL_URL ?? "http://localhost:9100";
-    this.peerId = ROLE_PEERS[opts.role];
+    this.baseUrl = opts.baseUrl ?? process.env.ZUNO_AXL_URL ?? "http://localhost:9002";
+    this.peerId = peerIdFor(opts.role);
     this.pollInterval = opts.pollIntervalMs ?? 120;
   }
 
-  /** Retries for ~10s so peers don't race the relay during `pnpm dev`. */
   async register(): Promise<void> {
     const deadline = Date.now() + 10_000;
     let lastErr: unknown;
@@ -53,7 +46,7 @@ export class AxlClient {
   }
 
   async send<T>(env: AxlEnvelope<T>): Promise<void> {
-    const to = ROLE_PEERS[env.to];
+    const to = peerIdFor(env.to);
     const res = await fetch(`${this.baseUrl}/send`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -64,7 +57,6 @@ export class AxlClient {
     }
   }
 
-  /** Send and wait for a matching response (same requestId, from = original `to`). */
   async request<TReq, TRes>(
     env: AxlEnvelope<TReq>,
     timeoutMs = 30_000,
@@ -73,9 +65,7 @@ export class AxlClient {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       const inbox = await this.recv();
-      const match = inbox.find(
-        (e) => e.requestId === env.requestId && e.from === env.to,
-      );
+      const match = inbox.find((e) => e.requestId === env.requestId && e.from === env.to);
       if (match) return match as AxlEnvelope<TRes>;
       await sleep(this.pollInterval);
     }
@@ -83,9 +73,7 @@ export class AxlClient {
   }
 
   async recv(): Promise<AxlEnvelope[]> {
-    const res = await fetch(
-      `${this.baseUrl}/recv?peerId=${encodeURIComponent(this.peerId)}`,
-    );
+    const res = await fetch(`${this.baseUrl}/recv?peerId=${encodeURIComponent(this.peerId)}`);
     if (!res.ok) throw new Error(`AXL recv failed: ${res.status}`);
     return (await res.json()) as AxlEnvelope[];
   }
@@ -95,7 +83,6 @@ export class AxlClient {
     return (await res.json()) as { peers: { peerId: string; role: string }[] };
   }
 
-  /** Poll the inbox and auto-send each handler return value back as `:response`. */
   async listen(handler: AxlHandler): Promise<void> {
     if (this.polling) return;
     this.polling = true;
@@ -128,9 +115,7 @@ export class AxlClient {
             });
           }
         }
-      } catch {
-        // network blip — back off and continue
-      }
+      } catch {}
       await sleep(this.pollInterval);
     }
   }
@@ -138,6 +123,43 @@ export class AxlClient {
   stop(): void {
     this.polling = false;
   }
+
+  subscribeFeed(handler: (event: AxlFeedEvent) => void): () => void {
+    const ctrl = new AbortController();
+    void (async () => {
+      try {
+        const res = await fetch(`${this.baseUrl}/feed`, { signal: ctrl.signal });
+        if (!res.ok || !res.body) return;
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) return;
+          buffer += decoder.decode(value, { stream: true });
+          const blocks = buffer.split("\n\n");
+          buffer = blocks.pop() ?? "";
+          for (const block of blocks) {
+            const dataLine = block.split("\n").find((line) => line.startsWith("data: "));
+            if (!dataLine) continue;
+            try {
+              const parsed = JSON.parse(dataLine.slice(6)) as AxlFeedEvent;
+              if (parsed.type === "envelope") handler(parsed);
+            } catch {}
+          }
+        }
+      } catch {}
+    })();
+    return () => ctrl.abort();
+  }
+}
+
+export interface AxlFeedEvent {
+  type: "envelope";
+  envelope: AxlEnvelope;
+  toPeerId: string;
+  toRole: string;
+  observedAt: number;
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
