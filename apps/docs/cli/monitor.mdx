@@ -1,0 +1,40 @@
+---
+title: Monitoring
+description: Run Zuno as a background LP watcher.
+---
+
+The interactive shell is the control surface. Continuous monitoring runs as a
+separate worker:
+
+```bash
+pnpm monitor
+```
+
+The worker reads the configured watch address, polls Uniswap v3 positions, detects
+out-of-range or near-boundary positions, and writes local alerts to:
+
+```
+~/.zuno/alerts.json
+```
+
+Inside `zuno`, use:
+
+```
+watch my wallet
+show alerts
+```
+
+`watch my wallet` verifies monitor configuration and shows the command to run.
+`show alerts` renders recent alerts without dumping JSON.
+
+## Environment
+
+```bash
+ZUNO_WATCH_ADDRESS=0x...
+ZUNO_CHAIN_ID=42161
+ZUNO_ARBITRUM_RPC_URL=https://...
+ZUNO_MONITOR_INTERVAL_MS=60000
+```
+
+The monitor never signs transactions. It only reads positions and writes local
+advisory alerts.

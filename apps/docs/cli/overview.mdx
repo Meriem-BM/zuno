@@ -1,29 +1,42 @@
 ---
 title: Overview
-description: The four commands that make up the zuno CLI.
+description: The interactive shell workflow.
 ---
 
 ```
-zuno wallet positions [owner]
-zuno inspect <positionId>
-zuno plan    <positionId>
-zuno diff    <planId>
+zuno
+
+analyze wallet 0x...
+show positions for 0x...
+inspect position <tokenId>
+recommend what I should do with this position
+show me the diff
+simulate it
+apply it
+watch my wallet
+show alerts
 ```
 
-| command   | summary                                                       |
-|-----------|---------------------------------------------------------------|
-| `wallet`  | List positions the wallet (or owner) holds                    |
-| `inspect` | Print a single position's snapshot: range, current, status   |
-| `plan`    | Run the full Watcher → Planner → Risk flow and return a plan  |
-| `diff`    | Re-render a previously generated plan from `~/.zuno/plans`    |
+| intent       | summary                                                      |
+|--------------|--------------------------------------------------------------|
+| wallet       | Set or inspect the read-only watch target                    |
+| positions    | List Uniswap v3 NFT positions held by the watch address      |
+| inspect      | Print one position snapshot: range, current tick, status     |
+| recommend    | Run Watcher → Planner → Risk when AXL is online, else local  |
+| diff         | Re-render before/after range and inventory changes           |
+| simulate     | Preview deterministic execution steps before signing         |
+| apply        | Prepare QR wallet approval; no private keys in the terminal  |
+| monitor      | Inspect monitor setup and read alerts from the worker        |
 
 Plans are persisted to `~/.zuno/plans/<planId>.json` so `zuno diff` works
 across sessions.
 
 ## Notes
 
-- The CLI is itself an AXL peer. It does not orchestrate the agents:
-  it sends a `flow_run` envelope to the Watcher and waits on its inbox
-  for progress events and a final `flow_run:done`.
-- All commands exit non-zero on agent timeout (default 30s).
+- The CLI is itself an AXL peer for recommendation flows. Direct reads,
+  diffs, simulation, and wallet state stay outside AXL.
+- If the mesh is not online, recommendation uses the same deterministic
+  planner locally and still stores the plan.
+- Continuous monitoring runs as `pnpm monitor`; the shell stays the control
+  surface and reads alerts with `show alerts`.
 - Output is plain ANSI. No colour-stripping needed for piping.

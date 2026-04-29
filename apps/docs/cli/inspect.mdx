@@ -4,7 +4,7 @@ description: Print a snapshot of a single position.
 ---
 
 ```
-zuno inspect <positionId>
+inspect position <tokenId>
 ```
 
 Reads a position and prints its current state, pair, fee tier, range,
@@ -16,7 +16,7 @@ during a `plan`, but stops there. No proposal. No risk note. No plan id.
 ## Example
 
 ```
-$ zuno inspect pos_4f2a3b
+$ inspect position pos_4f2a3b
 
   position    WETH / USDC 0.05%
   range       2,190.79 to 2,421.19   out of range
@@ -26,6 +26,6 @@ $ zuno inspect pos_4f2a3b
 
 ## When to use it
 
-- Before `zuno plan`, to confirm you're targeting the right position.
+- Before recommendation, to confirm you're targeting the right position.
 - As a quick health check across many positions in a script.
-- When debugging, `inspect` only invokes the Watcher's read path.
+- When debugging, `inspect` is a direct read and does not invoke the AXL mesh.

@@ -50,7 +50,6 @@ mean new `kind` values, never new transport.
 
 ## Inbox / poll model
 
-Peers pull from their own inbox via `GET /recv?peerId=<id>`. There are no
-push subscriptions in v0.1, the mock relay holds messages in memory and
-each peer long-polls. This matches the real Gensyn AXL surface, so the
-swap to a real daemon is a URL change.
+Peers pull from their own inbox via `GET /recv?peerId=<id>`. Zuno keeps the
+agent code behind `AxlClient`, so transport changes stay isolated to the AXL
+package.

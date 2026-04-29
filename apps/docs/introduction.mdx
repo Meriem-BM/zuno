@@ -10,7 +10,8 @@ It runs in your terminal. You point it at a position, and it returns a
 structured rebalance plan with a clear reason and a confidence score.
 
 ```
-$ zuno plan pos_4f2a3b
+$ zuno
+◇ recommend what I should do with this position
 
   ◇ watcher  read       pos_4f2a3b
   ◇ planner  propose
@@ -58,6 +59,9 @@ only routes, synthesises and explains. It never invents numbers.
 
 ## Status
 
-v0.1, fixture positions, AXL-compatible mock relay, no on-chain execution.
-The shape is real; the data is offline. `zuno apply` and live RPC reads
-land next.
+v0.1 supports read-only wallet sessions, Uniswap v3 NFT position reads through
+viem, deterministic recommendation, plan storage, diff, simulation preview,
+and guarded apply preparation. The full Watcher → Planner → Risk path runs
+over AXL when the local mesh is online; otherwise the same deterministic
+planner is used locally. `apply` requires explicit wallet-mode signing and
+does not store private keys or submit hidden transactions from the terminal.

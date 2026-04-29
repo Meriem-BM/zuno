@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "mintlify dev --port 3040",
-    "build": "mintlify build"
+    "build": "mintlify validate"
   },
   "devDependencies": {
     "mintlify": "latest"

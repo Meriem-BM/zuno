@@ -15,27 +15,20 @@ wearing a costume.
 
 - `packages/axl/src/client.ts`: `AxlClient` with `register`, `send`,
   `request`, `recv`, `topology`, `listen`.
-- `packages/axl/src/mock-server.ts`: a Bun HTTP server on `:9100` that
-  implements the same surface as the real Gensyn AXL daemon. Same routes,
-  same payload shapes.
-- `packages/axl/src/discovery.ts`: derives stable peer ids per role
-  (`watcher`, `planner`, `risk`, `cli`) so agents can find each other
-  without a directory service.
+- `packages/axl/src/discovery.ts`: reads the configured peer ids for
+  `watcher`, `planner`, `risk`, and `cli`.
 
-## Real vs mock
+## Configuration
 
-The mock relay is a development convenience. It is **not** ed25519-signed:
-peer ids are derived via `sha256(role)` and prefixed with `z`. Good
-enough to demo the topology; not real cryptography.
-
-To switch to a real `axl` daemon:
+Zuno expects real AXL nodes and real peer ids:
 
 ```bash
 export ZUNO_AXL_URL=http://localhost:9002
+export ZUNO_AXL_CLI_PEER_ID=...
+export ZUNO_AXL_WATCHER_PEER_ID=...
+export ZUNO_AXL_PLANNER_PEER_ID=...
+export ZUNO_AXL_RISK_PEER_ID=...
 ```
-
-The HTTP surface is identical, so no code changes. You will also need
-real ed25519 keypairs for each peer, that's part of the work for v0.2.
 
 ## Why long-poll instead of websockets
 
@@ -46,7 +39,7 @@ agent code never sees the wire.
 ## Inspecting the mesh
 
 ```bash
-curl http://localhost:9100/topology | jq
+curl http://localhost:9002/topology | jq
 ```
 
 Lists currently-registered peers and their roles. The CLI uses this on

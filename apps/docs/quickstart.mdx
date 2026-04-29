@@ -5,7 +5,8 @@ description: Boot the full mesh and run a plan in under a minute.
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) 1.1+
+- Node.js LTS
+- pnpm 9+
 - macOS or Linux
 
 ## Install
@@ -13,31 +14,35 @@ description: Boot the full mesh and run a plan in under a minute.
 ```bash
 git clone <your-fork-url> zuno
 cd zuno
-bun install
+pnpm install
 ```
 
-## One-shot demo
-
-The fastest path: boot the full mesh and run a plan against a fixture
-position in a single command.
+For live reads, configure a read-only watch address and chain:
 
 ```bash
-bun run demo
+export ZUNO_WATCH_ADDRESS=0x...
+export ZUNO_CHAIN_ID=42161
+export ZUNO_ARBITRUM_RPC_URL=https://...
+export ZUNO_MONITOR_INTERVAL_MS=60000
+export ZUNO_AXL_URL=http://localhost:9002
+export ZUNO_AXL_CLI_PEER_ID=...
+export ZUNO_AXL_WATCHER_PEER_ID=...
+export ZUNO_AXL_PLANNER_PEER_ID=...
+export ZUNO_AXL_RISK_PEER_ID=...
 ```
 
-You'll see four log streams interleave, `[axl]`, `[watcher]`,
-`[planner]`, `[risk]`, followed by the CLI output:
+Optional: enable model fallback for loose natural-language intent routing.
+The deterministic parser still runs first.
 
-```
-════════════════════════════════════════════════════════════════
-  ◇ watcher  read       pos_4f2a3b
-  ◇ planner  propose
-  ◇ risk     critique   2 candidates
-  ...
-════════════════════════════════════════════════════════════════
-```
+```bash
+# Cheap hosted fallback
+export ZUNO_INTENT_PROVIDER=groq
+export GROQ_API_KEY=...
+export ZUNO_INTENT_MODEL=llama-3.1-8b-instant
 
-Press `ctrl-c` to stop the mesh.
+# Useful when validating provider errors
+export ZUNO_DEBUG_INTENTS=true
+```
 
 ## Manual: four terminals
 
@@ -45,37 +50,63 @@ If you want to watch each agent independently:
 
 ```bash
 # terminal 1
-bun run axl:mock      # local AXL-compatible relay on :9100
+axl
 
 # terminal 2
-bun run watcher
+pnpm watcher
 
 # terminal 3
-bun run planner
+pnpm planner
 
 # terminal 4
-bun run risk
+pnpm risk
 ```
 
 Then, in a fifth terminal:
 
 ```bash
-bun run cli plan pos_4f2a3b
+pnpm cli
 ```
 
-## Pointing at a real AXL daemon
+Inside the shell:
 
-The bundled relay implements the same HTTP surface as the real Gensyn AXL
-node (`POST /send`, `GET /recv`, `GET /topology`). Switch with one env var:
+```
+analyze wallet 0x...
+show positions for 0x...
+inspect position 42
+recommend what I should do with this position
+show me the diff
+simulate it
+apply it
+```
+
+For live monitoring, run the worker in a separate terminal:
+
+```bash
+pnpm monitor
+```
+
+The worker writes local alerts to `~/.zuno/alerts.json`. In the shell, use:
+
+```
+show alerts
+watch my wallet
+```
+
+## AXL
+
+Zuno expects real AXL nodes. Configure the local node URL and each role's peer id:
 
 ```bash
 export ZUNO_AXL_URL=http://localhost:9002
+export ZUNO_AXL_CLI_PEER_ID=...
+export ZUNO_AXL_WATCHER_PEER_ID=...
+export ZUNO_AXL_PLANNER_PEER_ID=...
+export ZUNO_AXL_RISK_PEER_ID=...
 ```
-
-Nothing else changes.
 
 ## Landing page
 
 ```bash
-bun run dev    # http://localhost:3030
+pnpm web       # http://localhost:3030
 ```

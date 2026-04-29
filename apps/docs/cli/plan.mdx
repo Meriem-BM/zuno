@@ -4,11 +4,13 @@ description: Run the full agent flow and produce a rebalance plan.
 ---
 
 ```
-zuno plan <positionId>
+recommend what I should do with this position
 ```
 
-The headline command. Triggers the full Watcher → Planner → Risk flow over
-the AXL mesh and returns a structured, persisted plan.
+The headline workflow. When the AXL mesh is online, the CLI sends the request
+through Watcher → Planner → Risk and returns a structured, persisted plan. If
+the mesh is not online, the same deterministic planner runs locally so the LP
+workflow remains usable.
 
 ## What happens
 
@@ -33,7 +35,7 @@ The CLI shows progress events as each agent acts:
 ## Example output
 
 ```
-$ zuno plan pos_4f2a3b
+$ recommend what I should do with this position
 
   position    WETH / USDC 0.05%
   range       2,190.79 to 2,421.19   out of range
@@ -47,7 +49,7 @@ $ zuno plan pos_4f2a3b
 
   confidence  0.82  approve_with_caution
 
-  plan id     plan_dd4f9e0b6806    zuno diff plan_dd4f9e0b6806
+  plan id     plan_dd4f9e0b6806
 ```
 
 ## Confidence labels
@@ -56,9 +58,4 @@ $ zuno plan pos_4f2a3b
 |------------------------|--------------------------------------------------|
 | `approve`              | clear win, low risk                              |
 | `approve_with_caution` | acceptable, but Risk flagged at least one note   |
-| `defer`                | no candidate cleared the threshold, wait        |
-
-## Timeout
-
-The CLI waits up to 30s for the final envelope. If the mesh is partially
-down (e.g. Risk peer not started), it exits non-zero with the missing hop.
+| `reject`               | no candidate cleared the review                 |

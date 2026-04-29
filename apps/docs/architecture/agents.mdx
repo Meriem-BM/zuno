@@ -9,11 +9,11 @@ description: What Watcher, Planner, and Risk each do, and don't do.
 
 Listens for `flow_run` envelopes from the CLI peer. For each one it:
 
-1. Looks up the position by id (in v0.1, from fixtures; later from chain).
-2. Reads the pool's current tick and recent observations.
+1. Looks up the Uniswap v3 NFT position by id using the connected wallet.
+2. Reads the pool's current tick and liquidity through viem.
 3. Builds a `PositionSnapshot`: pair, fee tier, range, current price,
-   in/out of range flag, time-since-last-touched-boundary.
-4. Forwards a `flow_run` to the Planner peer with the snapshot in `body`.
+   in/out of range flag, and range utilization.
+4. Forwards `flow_propose` to the Planner peer with the snapshot.
 
 The Watcher never proposes anything and never holds opinions. If the read
 fails it emits `flow_run:error` and the flow stops.
@@ -22,14 +22,13 @@ fails it emits `flow_run:error` and the flow stops.
 
 **Proposes.** Two candidates, never more.
 
-Listens for `flow_run` envelopes from the Watcher. For each one it:
+Listens for `flow_propose` envelopes from the Watcher. For each one it:
 
 1. Computes a recommended range using deterministic tick math,
-   centred on the current tick, width derived from recent volatility.
+   centred on the current tick and width derived from the current band.
 2. Computes a tighter alternative: narrower band, higher fee capture,
    higher exit risk.
-3. Forwards a `flow_review` to the Risk peer with both candidates in
-   `body.candidates`.
+3. Forwards `flow_review` to the Risk peer with both candidates.
 
 Numbers come from `packages/uniswap`, the LLM is not in this loop. If
 you swap the model out, the proposed ranges do not change.
@@ -40,12 +39,11 @@ you swap the model out, the proposed ranges do not change.
 
 Listens for `flow_review` envelopes from the Planner. For each one it:
 
-1. Scores each candidate against a small set of checks: buffer-hours at
-   recent volatility, capital efficiency, slippage on the rebalance.
-2. Vetoes any candidate that fails a hard check (e.g. less than 12h buffer).
-3. Picks the highest-scoring survivor. If none survive: `defer`.
+1. Scores each candidate against deterministic checks: in-range coverage,
+   distance from current tick, and buffer width.
+2. Rejects the weaker candidate with a short reason.
+3. Picks the highest-scoring survivor.
 4. Emits `flow_run:done` back to the CLI peer with the chosen plan,
    the rejected alternatives, the reason string, and a confidence.
 
-This is also the agent that names the plan: the `planId` is a content
-hash of position id + recommendation + timestamp.
+This is also the agent that names the plan before emitting the final envelope.

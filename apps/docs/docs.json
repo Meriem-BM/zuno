@@ -25,7 +25,8 @@
           "cli/wallet",
           "cli/inspect",
           "cli/plan",
-          "cli/diff"
+          "cli/diff",
+          "cli/monitor"
         ]
       },
       {

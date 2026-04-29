@@ -4,21 +4,21 @@ description: Re-render a previously generated plan.
 ---
 
 ```
-zuno diff <planId>
+show me the diff
 ```
 
-Reads `~/.zuno/plans/<planId>.json` and re-renders the plan in the same
-format `zuno plan` produced it. Useful for:
+Reads the latest plan from session state, or a specific `plan_<id>` if one is
+named. The plan is loaded from `~/.zuno/plans/<planId>.json` and rendered as a
+before/after diff. Useful for:
 
-- Sharing a plan id with someone else who has Zuno installed.
+- Reviewing the exact target range before simulation.
 - Reviewing a plan after-the-fact without re-running the full mesh.
-- Diffing plan ids across runs (the plan id is a content hash of the
-  inputs + recommendation).
+- Comparing plan ids across runs.
 
 ## Example
 
 ```
-$ zuno diff plan_dd4f9e0b6806
+$ show me the diff
 
   position    WETH / USDC 0.05%
   range       2,190.79 to 2,421.19   out of range
@@ -34,5 +34,5 @@ $ zuno diff plan_dd4f9e0b6806
   ...
 ```
 
-Plan files are deterministic JSON, safe to commit to a private repo if
-you want to track decisions over time.
+Plan files contain position and recommendation details. Treat them as private
+trading records.
