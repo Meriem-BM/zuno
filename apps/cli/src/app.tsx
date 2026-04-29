@@ -1,7 +1,5 @@
 import {
   EchoLine,
-  IntentPanel,
-  SessionPanel,
   Welcome,
   palette,
   symbols,
@@ -9,12 +7,26 @@ import {
 import { Box, Static, Text } from "ink";
 import TextInput from "ink-text-input";
 import React, { useMemo } from "react";
-import { HelpPanel, ResultPanel } from "./shell/render-result.js";
-import type { ScrollItem, Turn } from "./types.js";
+import { ApplyConfirmation } from "./shell/apply-confirmation.js";
+import { MeshPanel } from "./shell/mesh-panel.js";
+import { MonitorTeaser } from "./shell/monitor-teaser.js";
+import { ClarificationPanel, HelpPanel, ResultPanel } from "./shell/render-result.js";
+import type { ScrollItem, Turn } from "./shell/types.js";
 import { useShell } from "./hooks/useShell.js";
+import { WalletStatus } from "./shell/wallet-status.js";
 
 export function App(): React.ReactElement {
-  const { snapshot, turns, draft, setDraft, submit } = useShell();
+  const {
+    snapshot,
+    turns,
+    draft,
+    pending,
+    fallbackActive,
+    fallbackProvider,
+    monitorPreview,
+    setDraft,
+    submit,
+  } = useShell();
 
   const scrollItems = useMemo<ScrollItem[]>(
     () => [
@@ -39,7 +51,12 @@ export function App(): React.ReactElement {
           )
         }
       </Static>
-      <SessionPanel state={snapshot} />
+      {pending ? (
+        <PendingLine text={pending} fallbackActive={fallbackActive} provider={fallbackProvider} />
+      ) : null}
+      <MonitorTeaser preview={monitorPreview} />
+      <MeshPanel />
+      <WalletStatus state={snapshot} />
       <Box marginTop={1}>
         <Text color={palette.accent}>{symbols.prompt} </Text>
         <TextInput value={draft} onChange={setDraft} onSubmit={submit} />
@@ -49,12 +66,54 @@ export function App(): React.ReactElement {
 }
 
 function TurnView({ turn }: { turn: Turn }): React.ReactElement {
+  const isApply = turn.intent.intent === "apply_plan" && turn.result;
   return (
     <Box flexDirection="column" marginTop={1}>
       <EchoLine text={turn.input} />
-      <IntentPanel intent={turn.intent} />
       {turn.intent.intent === "help" ? <HelpPanel /> : null}
-      {turn.result ? <ResultPanel result={turn.result} /> : null}
+      {turn.intent.intent === "needs_clarification" && turn.intent.clarification ? (
+        <ClarificationPanel text={turn.intent.clarification} />
+      ) : null}
+      {isApply ? (
+        <ApplyConfirmation result={turn.result!} />
+      ) : turn.result ? (
+        <ResultPanel result={turn.result} />
+      ) : null}
     </Box>
   );
+}
+
+function PendingLine({
+  text,
+  fallbackActive,
+  provider,
+}: {
+  text: string;
+  fallbackActive: boolean;
+  provider: string | null;
+}): React.ReactElement {
+  const message = fallbackActive ? aiFallbackMessage(provider) : pendingMessage(text);
+  return (
+    <Box marginTop={1}>
+      <Text color={palette.accent}>{symbols.diamond}</Text>
+      <Text color={palette.muted}>{` ${message}`}</Text>
+    </Box>
+  );
+}
+
+function aiFallbackMessage(provider: string | null): string {
+  return provider ? `routing with ${provider}...` : "routing with intent model...";
+}
+
+function pendingMessage(text: string): string {
+  if (/\bconnect\b.*\bwallet\b/iu.test(text)) return "checking read target...";
+  if (/^\s*0x[a-f0-9]{40}\s*$/iu.test(text)) return "reading wallet positions...";
+  if (/\b(show|list|my|analyze|analyse)\b.*\b(lp\s+)?(?:positions?|wallet|address)\b/iu.test(text)) return "reading positions...";
+  if (/\binspect|range|out of range|risky\b/iu.test(text)) return "checking position state...";
+  if (/\brecommend|rebalance|what should\b/iu.test(text)) return "asking watcher, planner, and risk...";
+  if (/\b(create|open|mint|provide)\b.*\b(position|liquidity|range)\b/iu.test(text)) return "checking product boundary...";
+  if (/\b(swap|trade|exchange|convert)\b/iu.test(text)) return "checking product boundary...";
+  if (/\bdiff|simulate|apply\b/iu.test(text)) return "preparing plan preview...";
+  if (/\bagent|peer|alert|watch|monitor\b/iu.test(text)) return "checking local services...";
+  return "thinking...";
 }

@@ -1,5 +1,5 @@
 import type { ToolExecutionResult } from "@zuno/runtime";
-import { Field, Row, palette, symbols } from "@zuno/ui-terminal";
+import { Row, palette, symbols, type Field } from "@zuno/ui-terminal";
 import { Box, Text } from "ink";
 import React from "react";
 import { HELP_LINES } from "../ui/constants.js";
@@ -9,31 +9,33 @@ export interface ResultPanelProps {
   result: ToolExecutionResult;
 }
 
-/**
- * Render a runtime tool result. Headline shows status + tool name + message;
- * the body picks structured fields per tool. Errors get the same shape with
- * the error code surfaced.
- */
 export function ResultPanel({ result }: ResultPanelProps): React.ReactElement {
   const isError = result.status === "error";
-  const fields: Field[] = [];
-  if (isError && result.errorCode) {
-    fields.push({ key: "code", value: result.errorCode });
-  }
-  fields.push(...formatResultData(result));
+  const fields: Field[] = formatResultData(result);
 
   return (
     <Box flexDirection="column" marginTop={1}>
       <Box>
-        <Text color={isError ? palette.bad : palette.ok}>
-          {isError ? "✕" : "✓"}
-        </Text>
-        <Text color={palette.muted}>{` ${result.tool}`}</Text>
+        <Text color={isError ? palette.bad : palette.ok}>{isError ? "✕" : "✓"}</Text>
+        <Text color={isError ? palette.bad : palette.fg}>{` ${headline(result)}`}</Text>
       </Box>
-      <Row field={{ key: "message", value: result.message }} />
       {fields.map((f) => (
         <Row key={f.key} field={f} />
       ))}
+      {isError && result.errorCode ? (
+        <Box>
+          <Text color={palette.faint}>{`  code        ${result.errorCode}`}</Text>
+        </Box>
+      ) : null}
+    </Box>
+  );
+}
+
+export function ClarificationPanel({ text }: { text: string }): React.ReactElement {
+  return (
+    <Box marginTop={1}>
+      <Text color={palette.warn}>{symbols.diamond}</Text>
+      <Text color={palette.fgDim}>{` ${text}`}</Text>
     </Box>
   );
 }
@@ -53,4 +55,46 @@ export function HelpPanel(): React.ReactElement {
       ))}
     </Box>
   );
+}
+
+function headline(result: ToolExecutionResult): string {
+  if (result.status === "error") return result.message;
+
+  switch (result.tool) {
+    case "connectWallet":
+      return "wallet connected";
+    case "listWalletPositions":
+      return result.message;
+    case "inspectPosition":
+      return "position snapshot";
+    case "checkRangeStatus":
+      return result.message;
+    case "listOutOfRangePositions":
+    case "listRiskyPositions":
+      return result.message;
+    case "recommendRebalance":
+      return "reviewed recommendation";
+    case "showPlanDiff":
+      return "plan diff";
+    case "simulatePlan":
+      return "simulation preview";
+    case "applyPlan":
+      return "wallet signing required";
+    case "monitorWallet":
+      return "monitor setup";
+    case "showAlerts":
+      return result.message;
+    case "showAgentStatus":
+      return "agent status";
+    case "showPeers":
+      return result.message;
+    case "showLogs":
+      return "recent activity";
+    case "createPosition":
+      return result.message;
+    case "swapTokens":
+      return result.message;
+    default:
+      return result.message;
+  }
 }
