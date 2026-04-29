@@ -2,7 +2,7 @@ import type { SessionState } from "@zuno/core";
 import type { Intent } from "@zuno/intents";
 import { Box, Text } from "ink";
 import React from "react";
-import { palette, symbols } from "./theme.js";
+import { palette, symbols } from "../theme/index.js";
 
 export interface Field {
   key: string;
@@ -63,11 +63,8 @@ function sessionFields(state: SessionState): Field[] {
   const fmt = (value: string | number | null): string =>
     value === null || value === undefined ? "—" : String(value);
   return [
-    { key: "wallet", value: fmt(state.walletAddress) },
-    { key: "chain", value: fmt(state.chainId) },
     { key: "position", value: fmt(state.lastPositionId) },
     { key: "plan", value: fmt(state.lastPlanId) },
-    { key: "signer", value: fmt(state.signerMode) },
     { key: "intent", value: fmt(state.lastIntent) },
   ];
 }

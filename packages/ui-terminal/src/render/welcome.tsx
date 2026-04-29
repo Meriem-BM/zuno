@@ -1,18 +1,14 @@
 import { Box, Text } from "ink";
 import React from "react";
-import { palette, symbols } from "./theme.js";
+import { palette, symbols } from "../theme/index.js";
 
 const EXAMPLES: readonly string[] = [
-  "show my positions",
+  "paste a wallet address",
+  "show positions for 0x...",
   "inspect position pos_4f2a3b",
-  "recommend what I should do with this position",
 ];
 
-const WORDMARK = [
-  "▀▀▀█ █  █ █▄ █ █▀▀█",
-  " ▄▀  █  █ █▀██ █  █",
-  "▀▀▀▀ ▀▀▀▀ ▀  ▀ ▀▀▀▀",
-] as const;
+const WORDMARK = ["▀▀▀█ █  █ █▄ █ █▀▀█", " ▄▀  █  █ █▀██ █  █", "▀▀▀▀ ▀▀▀▀ ▀  ▀ ▀▀▀▀"] as const;
 
 function Wordmark(): React.ReactElement {
   return (
@@ -41,7 +37,7 @@ export function Welcome({ version = "v0.1" }: WelcomeProps): React.ReactElement 
       </Box>
 
       <Box marginTop={1} flexDirection="column">
-        <Text color={palette.muted}>  try</Text>
+        <Text color={palette.muted}> try</Text>
         {EXAMPLES.map((example) => (
           <Box key={example}>
             <Text color={palette.faint}>{`   ${symbols.prompt} `}</Text>
@@ -51,7 +47,9 @@ export function Welcome({ version = "v0.1" }: WelcomeProps): React.ReactElement 
       </Box>
 
       <Box marginTop={1}>
-        <Text color={palette.faint}>{`  type ${symbols.prompt} exit  to quit  ·  ctrl+c also works`}</Text>
+        <Text
+          color={palette.faint}
+        >{`  type ${symbols.prompt} exit  to quit  ·  ctrl+c also works`}</Text>
       </Box>
     </Box>
   );

@@ -1,3 +1,3 @@
-export * from "./theme.js";
-export * from "./welcome.js";
-export * from "./panels.js";
+export * from "./theme/index.js";
+export * from "./render/welcome.js";
+export * from "./render/panels.js";
