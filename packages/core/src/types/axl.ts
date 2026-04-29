@@ -1,4 +1,4 @@
-import type { Address } from "./primitives.js";
+import type { Address, ChainId } from "./primitives.js";
 import type { PositionSnapshot } from "./position.js";
 import type { PlanCandidate, RiskNote } from "./plan.js";
 
@@ -16,6 +16,7 @@ export interface AxlEnvelope<T = unknown> {
 export interface InspectRequest {
   positionId: string;
   owner?: Address;
+  chainId?: ChainId;
 }
 
 export interface PlanRequest {
