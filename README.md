@@ -6,7 +6,10 @@ Zuno uses a small network of AXL-connected agents to inspect positions,
 debate rebalances, and produce execution-ready liquidity plans.
 
 ```
-$ zuno plan pos_4f2a3b
+$ zuno
+◇ analyze wallet 0xabc...
+◇ inspect position pos_4f2a3b
+◇ recommend what I should do with this position
 
   ◇ watcher  read       pos_4f2a3b
   ◇ planner  propose
@@ -25,7 +28,7 @@ $ zuno plan pos_4f2a3b
 
   confidence  0.82  approve_with_caution
 
-  plan id  plan_dd4f9e0b6806    zuno diff plan_dd4f9e0b6806
+  plan id  plan_dd4f9e0b6806
 ```
 
 ## Why three agents
@@ -38,11 +41,11 @@ Zuno splits the job across three specialised agents and routes them over
 [Gensyn AXL](https://blog.gensyn.ai/introducing-axl/), the peer-to-peer
 Agent eXchange Layer:
 
-| agent       | does                                                        |
-|-------------|-------------------------------------------------------------|
-| **Watcher** | reads the LP position and pool tick state from chain        |
-| **Planner** | proposes one or two structured rebalance candidates         |
-| **Risk**    | critiques the candidates, vetoes weak ones, picks a winner  |
+| agent       | does                                                       |
+| ----------- | ---------------------------------------------------------- |
+| **Watcher** | reads the LP position and pool tick state from chain       |
+| **Planner** | proposes one or two structured rebalance candidates        |
+| **Risk**    | critiques the candidates, vetoes weak ones, picks a winner |
 
 Each agent is its own process with its own AXL peer id (ed25519). They talk
 to each other directly over the AXL mesh, there is no central orchestrator.
@@ -78,15 +81,14 @@ packages/
   core                 shared types: Position, Plan, AxlEnvelope, …
   intents              intent parsing + routing
   ui-terminal          terminal renderer, panels, theme
-  wallet               wallet session, signer flows
+  wallet               address formatting and wallet-facing helpers
   storage              session store, plan store, persistence adapters
-  uniswap              tick math, position read, fixtures
-  planner              deterministic rebalance logic + diff building
-  agents               watcher, planner, risk (separate processes)
-  axl                  AxlClient + Gensyn-AXL-compatible mock daemon
-  execution            simulation, tx building, apply flow
+  uniswap              viem reads, tick math, position snapshots
+  planner              deterministic recommendations + diff building
+  agents               watcher, planner, risk, monitor (separate processes)
+  axl                  AxlClient + peer discovery configuration
+  execution            simulation preview + safe apply preparation
   config               chains, env parsing, shared config
-tooling/               demo script + walk-through notes
 ```
 
 ## Running locally
@@ -94,59 +96,130 @@ tooling/               demo script + walk-through notes
 ```bash
 pnpm install
 
-# Boot everything in one command, web, docs, AXL relay, all 3 agents
+# Boot the app surfaces and agent processes.
+# Run a real AXL node separately and configure peer ids in .env.
 pnpm dev
 ```
 
-| service  | port  |
-|----------|-------|
-| web      | 3030  |
-| docs     | 3040  |
-| axl mock | 9100  |
+| service | port |
+| ------- | ---- |
+| web     | 3030 |
+| docs    | 3040 |
 
 Then, in another terminal:
 
 ```bash
-pnpm cli plan pos_4f2a3b
+pnpm cli
 ```
 
-### Just the mesh + a plan
-
-```bash
-pnpm demo
-```
+Inside the shell, try `analyze wallet 0x...`, `show positions for 0x...`, and
+`recommend what I should do with this position`.
 
 ### One process at a time
 
 ```bash
-pnpm axl:mock        # local AXL-compatible relay on :9100
 pnpm watcher
 pnpm planner
 pnpm risk
+pnpm monitor          # optional background wallet monitor
 pnpm web             # next dev on :3030
 pnpm docs:dev        # mintlify on :3040
-pnpm cli plan pos_4f2a3b
+pnpm cli
 ```
 
-The bundled relay implements the same HTTP surface as the real Gensyn AXL
-node (`POST /send`, `GET /recv`, `GET /topology`). Point `ZUNO_AXL_URL` at a
-real `axl` daemon on `localhost:9002` and nothing else changes.
-
+Set `ZUNO_AXL_URL` and the four `ZUNO_AXL_*_PEER_ID` values to connect the CLI
+and agents to real AXL nodes.
 
 ## CLI
 
 ```
-zuno wallet positions [owner]
-zuno inspect <positionId>
-zuno plan    <positionId>
-zuno diff    <planId>
+zuno
+
+analyze wallet 0x...
+show positions for 0x...
+inspect position <tokenId>
+which positions are out of range
+recommend what I should do with this position
+show me the diff
+simulate it
+apply it
+watch my wallet
+show alerts
 ```
 
-Plans are persisted to `~/.zuno/plans/<planId>.json` so `zuno diff` works
-across sessions.
+The default path is read-only. Paste a wallet address or set
+`ZUNO_WATCH_ADDRESS`; Zuno uses that address for position reads,
+recommendations, diffs, simulation, and monitoring. No wallet connection is
+required until `apply`.
+
+Plans are persisted to `~/.zuno/plans/<planId>.json` so follow-ups like
+`show me the diff` and `simulate it` work across sessions.
+
+The optional monitor is a separate worker, not the interactive shell:
+
+```bash
+pnpm monitor
+```
+
+It polls the configured watch address, writes position alerts to
+`~/.zuno/alerts.json`, and the shell can inspect them with `show alerts`.
+
+## Environment
+
+Zuno reads positions through viem. Configure a default read-only watch target
+with:
+
+```bash
+ZUNO_WATCH_ADDRESS=0x...
+ZUNO_CHAIN_ID=42161
+ZUNO_ARBITRUM_RPC_URL=https://...
+ZUNO_MONITOR_INTERVAL_MS=60000
+ZUNO_AXL_URL=http://localhost:9002
+ZUNO_AXL_CLI_PEER_ID=...
+ZUNO_AXL_WATCHER_PEER_ID=...
+ZUNO_AXL_PLANNER_PEER_ID=...
+ZUNO_AXL_RISK_PEER_ID=...
+```
+
+Supported chains are Ethereum mainnet, Optimism, Base, and Arbitrum. RPC URLs
+are optional but recommended. `ZUNO_WALLET_ADDRESS` is still accepted as a
+legacy alias for the watch target.
+
+The CLI uses deterministic intent rules first. For low-confidence phrasing,
+you can enable a hosted model fallback:
+
+```bash
+# OpenAI
+ZUNO_INTENT_PROVIDER=openai
+OPENAI_API_KEY=...
+ZUNO_INTENT_MODEL=gpt-5-nano
+
+# or Groq, cheaper and fast enough for intent classification
+ZUNO_INTENT_PROVIDER=groq
+GROQ_API_KEY=...
+ZUNO_INTENT_MODEL=llama-3.1-8b-instant
+```
+
+Set `ZUNO_DEBUG_INTENTS=true` to print provider failures while testing.
+
+Execution is separate from reads. Applying a plan prepares a deterministic
+transaction summary and then requires QR-based wallet approval. Configure Reown
+/ WalletConnect with:
+
+```bash
+REOWN_PROJECT_ID=...
+# Optional during local integration if a session URI was created externally:
+ZUNO_WALLETCONNECT_URI=wc:...
+```
+
+The terminal never stores private keys or seed phrases and never silently signs.
 
 ## Status
 
-v0.1, fixture positions, AXL-compatible mock relay, no on-chain execution.
-The shape is real; the data is offline. `zuno apply` and live RPC reads land
-next.
+v0.1 now has wallet-aware Uniswap v3 NFT position reads, deterministic
+recommendations, plan storage, diff, simulation preview, and a guarded apply
+preparation path. AXL recommendations run over separate Watcher, Planner, and
+Risk peers when the mesh is online; otherwise the CLI uses the same deterministic
+planner locally. Reads are address-based by default. `apply` prepares the
+transaction path and requires QR wallet approval; transaction submission is
+blocked until the wallet approval session is present.

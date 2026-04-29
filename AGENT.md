@@ -1,12 +1,15 @@
 # AGENT.md
 
 ## What we are building
+
 Zuno is a terminal-native Uniswap LP copilot.
 
 A user runs:
+
 - `zuno`
 
 Then types plain English inside the shell, for example:
+
 - connect my wallet
 - show my positions
 - inspect position 42
@@ -19,7 +22,9 @@ Zuno is not a generic wallet chatbot.
 It is a focused LP workflow tool.
 
 ## Product goals
+
 Zuno should help a liquidity provider answer:
+
 - what positions do I have
 - which positions are out of range
 - what does this position look like right now
@@ -28,6 +33,7 @@ Zuno should help a liquidity provider answer:
 - can I simulate it before signing
 
 ## Core interaction model
+
 1. User launches `zuno`
 2. User types plain English
 3. Intent parser maps text to a structured intent
@@ -39,12 +45,14 @@ Zuno should help a liquidity provider answer:
 ## Intents to support
 
 ### Wallet
+
 - connect wallet
 - show wallet balance
 - show my positions
 - transfer token
 
 ### Position reads
+
 - inspect a position
 - inspect all positions
 - check range status
@@ -52,30 +60,36 @@ Zuno should help a liquidity provider answer:
 - list risky positions
 
 ### Recommendation
+
 - recommend a rebalance
 - show rebalance options
 - explain why a recommendation was chosen
 
 ### Plan review and execution
+
 - show the diff
 - simulate the plan
 - apply the plan
 
 ### Agent/network
+
 - show agent status
 - show peers
 - show logs
 
 ## Which tasks use AXL
+
 Use AXL only for recommendation-style flows and agent health visibility.
 
 Use AXL for:
+
 - recommend rebalance
 - show rebalance options
 - agent status
 - peers / agent visibility
 
 Do not use AXL for:
+
 - wallet balance
 - listing positions
 - inspecting positions
@@ -87,26 +101,33 @@ Do not use AXL for:
 ## Agent roles
 
 ### Watcher
+
 Responsible for:
+
 - reading LP position state
 - reading pool state
 - reading price/tick/range context
 - producing structured position state
 
 ### Planner
+
 Responsible for:
+
 - generating 1-2 rebalance candidates
 - producing structured candidate output
 - keeping candidate generation concise and deterministic where possible
 
 ### Risk
+
 Responsible for:
+
 - critiquing proposed candidates
 - rejecting weak or overly risky plans
 - selecting the final winner
 - producing a short reason the user can understand
 
 ## AXL flow
+
 Recommendation flow:
 
 1. CLI receives recommendation intent
@@ -124,10 +145,12 @@ Simple message chain:
 CLI -> Watcher -> Planner -> Risk -> CLI
 
 ## Tooling model
+
 The model should not directly manipulate chain state.
 Use tools.
 
 ### Direct deterministic tools
+
 - wallet session tools
 - wallet balance tools
 - position fetch tools
@@ -139,13 +162,16 @@ Use tools.
 - transaction builder
 
 ### Agent tools
+
 - send request to Watcher
 - send state to Planner
 - send candidates to Risk
 - ping peers / inspect agent status
 
 ## Session state
+
 Keep a small session memory in the shell:
+
 - wallet address
 - current chain
 - last inspected position
@@ -154,25 +180,30 @@ Keep a small session memory in the shell:
 - last intent
 
 This allows references like:
+
 - this position
 - that plan
 - apply it
 - show me the diff
 
 ## Persistence
+
 Default to minimal local state.
 Store only what is necessary:
+
 - latest plan
 - recent plan history
 - request ids
 - non-sensitive logs
 
 Do not store:
+
 - seed phrases
 - raw private keys
 - unnecessary personal data
 
 ## Wallet safety rules
+
 - The terminal must not own the user's key by default.
 - The personal wallet signs transactions in a wallet UI.
 - Every state-changing transaction requires explicit user confirmation.
@@ -180,6 +211,7 @@ Do not store:
 - Enclave execution only works when onchain authority exists.
 
 ## Guardrails
+
 - Never invent balances, fees, or prices.
 - Never fabricate a position id.
 - Never silently execute a transaction.
@@ -188,6 +220,7 @@ Do not store:
 - Never bypass onchain ownership rules.
 
 ## Coding expectations
+
 - deterministic logic for anything financial
 - clean boundaries between packages
 - typed message contracts
@@ -198,7 +231,9 @@ Do not store:
 - no deprecated patterns if a stable modern replacement exists
 
 ## Design expectations
+
 CLI:
+
 - minimal
 - premium
 - readable
@@ -206,6 +241,7 @@ CLI:
 - not noisy
 
 Landing page:
+
 - minimalist
 - restrained
 - technical
@@ -213,7 +249,9 @@ Landing page:
 - no clutter
 
 ## Quality bar
+
 Code should be:
+
 - clean
 - modular
 - scalable
@@ -225,7 +263,9 @@ Code should be:
 ## Git workflow
 
 ### Branch naming
+
 Use short, descriptive branch names with these prefixes:
+
 - `feat/`
 - `fix/`
 - `refactor/`
@@ -234,6 +274,7 @@ Use short, descriptive branch names with these prefixes:
 - `test/`
 
 Examples:
+
 - `feat/interactive-shell`
 - `feat/ui-terminal-header`
 - `fix/wallet-session-timeout`
@@ -241,9 +282,11 @@ Examples:
 - `docs/setup-guide`
 
 ### Commit message standard
+
 Use lowercase, one-line, conventional-style commit messages.
 
 Format:
+
 - `feat(scope): message`
 - `fix(scope): message`
 - `refactor(scope): message`
@@ -252,6 +295,7 @@ Format:
 - `test(scope): message`
 
 Rules:
+
 - use imperative mood
 - keep it concise
 - do not end with a period
@@ -259,6 +303,7 @@ Rules:
 - prefer a clear scope when useful
 
 Examples:
+
 - `feat(ui): add zuno welcome header`
 - `feat(uniswap): add position range status helper`
 - `fix(wallet): prevent stale signer session reuse`
@@ -267,7 +312,9 @@ Examples:
 - `test(planner): cover candidate veto rules`
 
 ### Pull request requirements
+
 Every PR should:
+
 - pass CI
 - pass typecheck
 - pass lint
@@ -275,6 +322,7 @@ Every PR should:
 - keep documentation in sync when architecture or setup changes
 
 Any PR touching these areas requires extra review:
+
 - signer flows
 - wallet connection
 - execution pipeline
@@ -285,7 +333,9 @@ Any PR touching these areas requires extra review:
 - anything that can affect security or fund movement
 
 ### Review expectations
+
 Before merging:
+
 - confirm the change matches the intended package boundary
 - confirm no sensitive wallet data is stored
 - confirm financial logic remains deterministic
@@ -293,7 +343,9 @@ Before merging:
 - confirm naming and public interfaces stay clear and minimal
 
 ## Definition of done
+
 A task is done only when:
+
 - the feature works end to end for its intended path
 - typecheck passes
 - lint passes
@@ -304,6 +356,7 @@ A task is done only when:
 - public interfaces are named clearly and intentionally
 
 ## Dependency rules
+
 - Prefer existing repo packages before adding a new dependency.
 - Add a new dependency only with a clear reason.
 - Avoid overlapping libraries that solve the same problem.
@@ -313,6 +366,7 @@ A task is done only when:
 - Do not add a package when a small local utility is enough.
 
 ## File and module rules
+
 - Avoid large multi-purpose files.
 - Split a module when responsibilities start to diverge.
 - Keep public module APIs small and explicit.
@@ -322,6 +376,7 @@ A task is done only when:
 - Keep shared domain logic out of UI and transport layers.
 
 ## Logging rules
+
 - Use structured logs where possible.
 - Include request ids and plan ids in multi-step flows.
 - Never log secrets, private keys, seed phrases, or sensitive session tokens.
@@ -330,6 +385,7 @@ A task is done only when:
 - Log enough context to debug agent flows without leaking sensitive data.
 
 ## Environment and config rules
+
 - Validate environment variables at startup.
 - Document every required environment variable.
 - Fail early on missing or invalid configuration.
@@ -339,6 +395,7 @@ A task is done only when:
 - Do not hardcode secrets, RPC URLs, or signer credentials.
 
 ## Inter-agent message contract rules
+
 - All AXL messages must use typed schemas.
 - Validate inbound and outbound payloads.
 - Include a request id on every cross-agent flow.
@@ -348,6 +405,7 @@ A task is done only when:
 - Keep transport metadata separate from domain payloads.
 
 ## Testing strategy
+
 - Add unit tests for deterministic logic first.
 - Test intent parsing with realistic plain-English inputs.
 - Test planner candidate generation with clear fixtures.
@@ -358,6 +416,7 @@ A task is done only when:
 - Avoid weak assertions that only check truthiness.
 
 ## Performance rules
+
 - Keep `zuno` startup fast.
 - Avoid blocking the interactive shell unnecessarily.
 - Minimize repeated network calls.
@@ -367,6 +426,7 @@ A task is done only when:
 - Do not trade correctness for minor speed gains in financial logic.
 
 ## Release and change management
+
 - Document breaking changes clearly.
 - Make behavior changes in signer, execution, or planner flows explicit.
 - Avoid silent changes to security-sensitive paths.
@@ -374,6 +434,7 @@ A task is done only when:
 - Update examples and setup docs when developer workflow changes.
 
 ## Do not merge if
+
 - typecheck fails
 - lint fails
 - tests fail
@@ -383,6 +444,7 @@ A task is done only when:
 - a new dependency was added without a clear reason
 
 ## Module cohesion and file-splitting rules
+
 - Do not split files too early.
 - Prefer fewer, stronger modules over many tiny files.
 - A new file must earn its existence through a real boundary of responsibility.
@@ -406,7 +468,9 @@ A task is done only when:
 - Refactor into more files only after the feature proves stable and clearly grows.
 
 ## Simplicity-first implementation rule
+
 When implementing a feature, optimize in this order:
+
 1. readability
 2. cohesion
 3. low file count
