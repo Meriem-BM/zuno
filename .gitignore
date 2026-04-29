@@ -14,6 +14,7 @@ coverage/
 
 # local agent/config folders
 .agent/
+.agents/
 .claude/
 
 # local generated files
