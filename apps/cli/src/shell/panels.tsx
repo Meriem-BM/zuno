@@ -1,8 +1,8 @@
 import type { ToolExecutionResult } from "@zuno/runtime";
-import { Row, palette, symbols, type Field } from "@zuno/ui-terminal";
+import { Row, palette, symbols, type Field } from "@zuno/terminal";
 import { Box, Text } from "ink";
 import React from "react";
-import { HELP_LINES } from "../ui/constants.js";
+import { HELP_LINES } from "../lib/constants.js";
 import { formatResultData } from "../ui/format.js";
 
 export interface ResultPanelProps {
@@ -11,24 +11,39 @@ export interface ResultPanelProps {
 
 export function ResultPanel({ result }: ResultPanelProps): React.ReactElement {
   const isError = result.status === "error";
+  const isPending = result.status === "needs_confirmation";
   const fields: Field[] = formatResultData(result);
+  const glyph = isError ? "✕" : isPending ? "?" : "✓";
+  const glyphColor = isError ? palette.bad : isPending ? palette.warn : palette.ok;
+  const labelColor = isError ? palette.bad : palette.fg;
 
   return (
     <Box flexDirection="column" marginTop={1}>
       <Box>
-        <Text color={isError ? palette.bad : palette.ok}>{isError ? "✕" : "✓"}</Text>
-        <Text color={isError ? palette.bad : palette.fg}>{` ${headline(result)}`}</Text>
+        <Text color={glyphColor}>{glyph}</Text>
+        <Text color={labelColor}>{` ${headline(result)}`}</Text>
       </Box>
-      {fields.map((f) => (
-        <Row key={f.key} field={f} />
+      {fields.map((f, i) => (
+        <Row key={`${f.key}-${i}`} field={f} />
       ))}
       {isError && result.errorCode ? (
         <Box>
           <Text color={palette.faint}>{`  code        ${result.errorCode}`}</Text>
         </Box>
       ) : null}
+      {isPending ? (
+        <Box marginTop={1}>
+          <Text color={palette.warn}>{`  ${symbols.diamond} `}</Text>
+          <Text color={palette.fgDim}>{confirmPrompt(result)}</Text>
+        </Box>
+      ) : null}
     </Box>
   );
+}
+
+function confirmPrompt(result: ToolExecutionResult): string {
+  const data = result.data as { prompt?: string } | undefined;
+  return data?.prompt ?? 'Type "approve it" to confirm.';
 }
 
 export function ClarificationPanel({ text }: { text: string }): React.ReactElement {
@@ -61,9 +76,28 @@ function headline(result: ToolExecutionResult): string {
   if (result.status === "error") return result.message;
 
   switch (result.tool) {
-    case "connectWallet":
-      return "wallet connected";
-    case "listWalletPositions":
+    case "createAgentWallet":
+      return "zuno wallet ready";
+    case "showAgentWallet":
+      return "zuno wallet";
+    case "showAgentWalletBalance":
+      return "zuno wallet balance";
+    case "showBalances":
+      return result.message;
+    case "showNetwork":
+      return result.message;
+    case "switchNetwork":
+      return result.message;
+    case "showAllowances":
+      return result.message;
+    case "prepareSwap":
+    case "showQuote":
+      return "swap quote";
+    case "approveToken":
+      return "approve token";
+    case "fundAgentWallet":
+      return "fund zuno wallet";
+    case "listAgentWalletPositions":
       return result.message;
     case "inspectPosition":
       return "position snapshot";
@@ -78,8 +112,10 @@ function headline(result: ToolExecutionResult): string {
       return "plan diff";
     case "simulatePlan":
       return "simulation preview";
+    case "approvePlan":
+      return "plan approved";
     case "applyPlan":
-      return "wallet signing required";
+      return "turnkey execution";
     case "monitorWallet":
       return "monitor setup";
     case "showAlerts":

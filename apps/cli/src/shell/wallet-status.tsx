@@ -1,6 +1,6 @@
 import type { SessionState } from "@zuno/core";
-import { chainNameFor, shortAddr } from "@zuno/wallet";
-import { palette, symbols } from "@zuno/ui-terminal";
+import { chainNameFor, shortAddr } from "@zuno/chain/wallet";
+import { palette, symbols } from "@zuno/terminal";
 import { Box, Text } from "ink";
 import React from "react";
 
@@ -8,21 +8,15 @@ export interface WalletStatusProps {
   state: SessionState;
 }
 
-/**
- * Compact status line above the prompt. This is intentionally not part of the
- * scrollback; it gives operator context without repeating a full session panel.
- */
 export function WalletStatus({ state }: WalletStatusProps): React.ReactElement {
-  if (!state.watchAddress && !state.walletAddress) {
-    return <StatusLine parts={["read-only", "paste wallet address"]} />;
+  if (!state.agentWalletAddress) {
+    return <StatusLine parts={["zuno wallet missing", "create my zuno wallet"]} />;
   }
 
   const chain = state.chainId ? chainNameFor(state.chainId) : "—";
-  const parts = [];
-  if (state.watchAddress) parts.push(`watch ${shortAddr(state.watchAddress)} on ${chain}`);
-  if (state.walletAddress) parts.push(`exec ${shortAddr(state.walletAddress)}`);
-  if (!state.watchAddress && state.walletAddress)
-    parts.push(`watch ${shortAddr(state.walletAddress)} on ${chain}`);
+  const parts = [`zuno ${shortAddr(state.agentWalletAddress)} on ${chain}`];
+  if (state.approvalState) parts.push(`approval ${state.approvalState}`);
+  if (state.executionState) parts.push(`execution ${state.executionState}`);
   if (state.lastPositionId) parts.push(`position ${state.lastPositionId}`);
   if (state.lastPlanId) parts.push(`plan ${state.lastPlanId}`);
 

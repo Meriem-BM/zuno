@@ -1,32 +1,32 @@
 {
   "name": "@zuno/cli",
   "version": "0.1.0",
+  "description": "Terminal-native copilot for Uniswap LPs.",
   "type": "module",
   "bin": {
     "zuno": "./src/index.tsx"
   },
   "scripts": {
     "start": "tsx src/index.tsx",
+    "build": "tsx build.ts",
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@zuno/axl": "workspace:*",
+    "@zuno/chain": "workspace:*",
     "@zuno/core": "workspace:*",
-    "@zuno/intents": "workspace:*",
     "@zuno/runtime": "workspace:*",
-    "@zuno/ui-terminal": "workspace:*",
-    "@zuno/wallet": "workspace:*",
+    "@zuno/strategy": "workspace:*",
+    "@zuno/terminal": "workspace:*",
     "ink": "^6.3.0",
     "ink-text-input": "^6.0.0",
-    "qrcode-terminal": "^0.12.0",
     "react": "^19.2.0"
   },
   "devDependencies": {
-    "@zuno/planner": "workspace:*",
-    "@zuno/storage": "workspace:*",
-    "@zuno/uniswap": "workspace:*",
+    "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
+    "@zuno/storage": "workspace:*",
+    "esbuild": "^0.25.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   }

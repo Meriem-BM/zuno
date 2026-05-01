@@ -2,10 +2,9 @@ import type { SessionState } from "@zuno/core";
 import {
   parseIntent,
   type Intent,
-  type IntentKind,
   type ModelFallback,
   type PendingClarification,
-} from "@zuno/intents";
+} from "@zuno/strategy/intents";
 import {
   TOOLS,
   executeIntent,
@@ -13,13 +12,7 @@ import {
   type ToolExecutionResult,
   type ToolRegistry,
 } from "@zuno/runtime";
-
-const SHELL_LEVEL: ReadonlySet<IntentKind> = new Set<IntentKind>([
-  "exit",
-  "help",
-  "unknown",
-  "needs_clarification",
-]);
+import { SHELL_LEVEL_INTENTS } from "../lib/constants.js";
 
 export interface IntentRun {
   intent: Intent;
@@ -33,6 +26,7 @@ export interface RunIntentOptions {
   tools?: ToolRegistry;
   planStore?: ExecutionContext["planStore"];
   alertStore?: ExecutionContext["alertStore"];
+  walletService?: ExecutionContext["walletService"];
 }
 
 export async function runIntent(
@@ -45,8 +39,15 @@ export async function runIntent(
     fallback: options.fallback,
     pending: options.pending,
   });
+  return executeParsed(intent, session, options);
+}
 
-  if (SHELL_LEVEL.has(intent.intent)) {
+export async function executeParsed(
+  intent: Intent,
+  session: SessionState,
+  options: RunIntentOptions = {},
+): Promise<IntentRun> {
+  if (SHELL_LEVEL_INTENTS.has(intent.intent)) {
     return { intent, session: { ...session, lastIntent: intent.intent } };
   }
 
@@ -55,12 +56,13 @@ export async function runIntent(
     tools: options.tools ?? TOOLS,
     planStore: options.planStore,
     alertStore: options.alertStore,
+    walletService: options.walletService,
   });
   return { intent, result: outcome.result, session: outcome.session };
 }
 
 export function isShellLevelIntent(intent: Intent): boolean {
-  return SHELL_LEVEL.has(intent.intent);
+  return SHELL_LEVEL_INTENTS.has(intent.intent);
 }
 
 export function pendingFromIntent(intent: Intent): PendingClarification | null {
@@ -72,6 +74,5 @@ export function pendingFromIntent(intent: Intent): PendingClarification | null {
     field: intent.pendingField,
     positionId: intent.positionId,
     planId: intent.planId,
-    signerMode: intent.signerMode,
   };
 }

@@ -1,7 +1,6 @@
 import type { ApplyPlanData, ToolExecutionResult } from "@zuno/runtime";
-import { palette, symbols } from "@zuno/ui-terminal";
+import { palette, symbols } from "@zuno/terminal";
 import { Box, Text } from "ink";
-import qrcode from "qrcode-terminal";
 import React from "react";
 
 const KEY_WIDTH = 14;
@@ -11,19 +10,12 @@ export interface ApplyConfirmationProps {
   result: ToolExecutionResult;
 }
 
-/**
- * Dedicated apply confirmation card. Bigger and more prominent than the
- * generic ResultPanel. This is the "stop and look" moment between plan
- * preparation and the wallet popup — the user sees the full picture in one
- * panel: position, range change, cost, residual, and the Risk verdict.
- */
 export function ApplyConfirmation({ result }: ApplyConfirmationProps): React.ReactElement {
   if (result.status !== "success" || !result.data) {
     return <BlockedPanel result={result} />;
   }
 
   const data = result.data as ApplyPlanData;
-  const qr = data.approval.uri ? terminalQr(data.approval.uri) : null;
   const verdictColor =
     data.verdict === "approve"
       ? palette.ok
@@ -99,43 +91,19 @@ export function ApplyConfirmation({ result }: ApplyConfirmationProps): React.Rea
       <Box marginTop={1}>
         <Text color={palette.accent} bold>{`  ${symbols.prompt} `}</Text>
         <Text color={palette.fg} bold>
-          {data.status === "requires_wallet_signature"
-            ? "wallet approval required - scan the terminal QR when available"
-            : data.summary}
+          {data.summary}
         </Text>
       </Box>
       <Box flexDirection="column">
-        <Row
-          k="approval"
-          v={approvalLabel(data.approval.status)}
-          accent={data.approval.status === "ready"}
-        />
-        {data.approval.instructions.map((instruction, i) => (
-          <Row key={`approval-${i}`} k={i === 0 ? "next" : "·"} v={instruction} muted />
-        ))}
-        {qr ? (
-          <Box marginTop={1}>
-            <Text color={palette.fg}>{qr}</Text>
-          </Box>
-        ) : null}
+        <Row k="zuno wallet" v={data.agentWalletAddress} />
+        <Row k="approval" v={data.approvalState} accent />
+        <Row k="execution" v={data.executionState} accent={data.executionState === "submitted"} />
+        {data.transactionHash ? <Row k="tx" v={data.transactionHash} /> : null}
+        {data.turnkeyActivityId ? <Row k="turnkey" v={data.turnkeyActivityId} muted /> : null}
       </Box>
       <Text color={palette.muted}>{`  ${HR}`}</Text>
     </Box>
   );
-}
-
-function approvalLabel(status: ApplyPlanData["approval"]["status"]): string {
-  if (status === "ready") return "WalletConnect QR ready";
-  if (status === "requires_session") return "create WalletConnect session";
-  return "set REOWN_PROJECT_ID for QR session";
-}
-
-function terminalQr(uri: string): string {
-  let out = "";
-  qrcode.generate(uri, { small: true }, (qr) => {
-    out = qr;
-  });
-  return out.trimEnd();
 }
 
 function BlockedPanel({ result }: { result: ToolExecutionResult }): React.ReactElement {

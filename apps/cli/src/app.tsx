@@ -1,19 +1,13 @@
-import {
-  EchoLine,
-  Welcome,
-  palette,
-  symbols,
-} from "@zuno/ui-terminal";
+import { EchoLine, Welcome, palette, symbols } from "@zuno/terminal";
 import { Box, Static, Text } from "ink";
 import TextInput from "ink-text-input";
 import React, { useMemo } from "react";
-import { ApplyConfirmation } from "./shell/apply-confirmation.js";
-import { MeshPanel } from "./shell/mesh-panel.js";
-import { MonitorTeaser } from "./shell/monitor-teaser.js";
-import { ClarificationPanel, HelpPanel, ResultPanel } from "./shell/render-result.js";
-import type { ScrollItem, Turn } from "./shell/types.js";
 import { useShell } from "./hooks/useShell.js";
+import { ApplyConfirmation } from "./shell/apply-confirmation.js";
+import { AuthFlow } from "./shell/auth-flow.js";
+import { ClarificationPanel, HelpPanel, ResultPanel } from "./shell/panels.js";
 import { WalletStatus } from "./shell/wallet-status.js";
+import type { ScrollItem, Turn } from "./types/index.js";
 
 export function App(): React.ReactElement {
   const {
@@ -23,7 +17,7 @@ export function App(): React.ReactElement {
     pending,
     fallbackActive,
     fallbackProvider,
-    monitorPreview,
+    auth,
     setDraft,
     submit,
   } = useShell();
@@ -51,16 +45,24 @@ export function App(): React.ReactElement {
           )
         }
       </Static>
-      {pending ? (
-        <PendingLine text={pending} fallbackActive={fallbackActive} provider={fallbackProvider} />
-      ) : null}
-      <MonitorTeaser preview={monitorPreview} />
-      <MeshPanel />
-      <WalletStatus state={snapshot} />
-      <Box marginTop={1}>
-        <Text color={palette.accent}>{symbols.prompt} </Text>
-        <TextInput value={draft} onChange={setDraft} onSubmit={submit} />
-      </Box>
+      {auth ? (
+        <AuthFlow state={auth} draft={draft} onChange={setDraft} onSubmit={submit} />
+      ) : (
+        <>
+          {pending ? (
+            <PendingLine
+              text={pending}
+              fallbackActive={fallbackActive}
+              provider={fallbackProvider}
+            />
+          ) : null}
+          <WalletStatus state={snapshot} />
+          <Box marginTop={1}>
+            <Text color={palette.accent}>{symbols.prompt} </Text>
+            <TextInput value={draft} onChange={setDraft} onSubmit={submit} />
+          </Box>
+        </>
+      )}
     </Box>
   );
 }
@@ -108,10 +110,13 @@ function aiFallbackMessage(provider: string | null): string {
 function pendingMessage(text: string): string {
   if (/\bconnect\b.*\bwallet\b/iu.test(text)) return "checking read target...";
   if (/^\s*0x[a-f0-9]{40}\s*$/iu.test(text)) return "reading wallet positions...";
-  if (/\b(show|list|my|analyze|analyse)\b.*\b(lp\s+)?(?:positions?|wallet|address)\b/iu.test(text)) return "reading positions...";
+  if (/\b(show|list|my|analyze|analyse)\b.*\b(lp\s+)?(?:positions?|wallet|address)\b/iu.test(text))
+    return "reading positions...";
   if (/\binspect|range|out of range|risky\b/iu.test(text)) return "checking position state...";
-  if (/\brecommend|rebalance|what should\b/iu.test(text)) return "asking watcher, planner, and risk...";
-  if (/\b(create|open|mint|provide)\b.*\b(position|liquidity|range)\b/iu.test(text)) return "checking product boundary...";
+  if (/\brecommend|rebalance|what should\b/iu.test(text))
+    return "asking watcher, planner, and risk...";
+  if (/\b(create|open|mint|provide)\b.*\b(position|liquidity|range)\b/iu.test(text))
+    return "checking product boundary...";
   if (/\b(swap|trade|exchange|convert)\b/iu.test(text)) return "checking product boundary...";
   if (/\bdiff|simulate|apply\b/iu.test(text)) return "preparing plan preview...";
   if (/\bagent|peer|alert|watch|monitor\b/iu.test(text)) return "checking local services...";

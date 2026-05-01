@@ -1,344 +1,229 @@
 import assert from "node:assert/strict";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { describe, it } from "node:test";
-import {
-  createSession,
-  type Address,
-  type Position,
-  type SessionState,
-  type Token,
-} from "@zuno/core";
-import { buildPlanDiff, recommendPlan } from "@zuno/planner";
+import { createSession, type Address, type Position, type SessionState } from "@zuno/core";
+import { buildPlanDiff, recommendPlan } from "@zuno/strategy/planner";
 import { createMemoryPlanStore } from "@zuno/storage";
-import { buildSnapshot, tickToPrice } from "@zuno/uniswap";
+import { buildSnapshot, tickToPrice } from "@zuno/chain/uniswap";
 import type { ToolRegistry } from "@zuno/runtime";
 import { runIntent } from "../src/shell/run-intent.js";
 
-process.env.ZUNO_AXL_URL = "http://127.0.0.1:1";
-process.env.ZUNO_PLAN_DIR = join(tmpdir(), `zuno-test-plans-${process.pid}`);
+process.env.ZUNO_AXL_CLI_API_URL = "http://127.0.0.1:1";
+process.env.ZUNO_AXL_CLI_PEER_ID ??= "0".repeat(64);
+process.env.ZUNO_AXL_WATCHER_PEER_ID ??= "1".repeat(64);
+process.env.ZUNO_AXL_PLANNER_PEER_ID ??= "2".repeat(64);
+process.env.ZUNO_AXL_RISK_PEER_ID ??= "3".repeat(64);
 
+const agentWallet = "0xabc1230000000000000000000000000000000def" as Address;
 const emptySession: SessionState = {
-  watchAddress: null,
-  walletAddress: null,
+  userWalletAddress: null,
+  agentWalletAddress: null,
   chainId: null,
   lastPositionId: null,
   lastPlanId: null,
   lastIntent: null,
-  signerMode: null,
+  approvalState: "idle",
+  executionState: "idle",
 };
 
-const testWallet = "0xabc1230000000000000000000000000000000def" as Address;
-process.env.ZUNO_WATCH_ADDRESS = testWallet;
 const planStore = createMemoryPlanStore();
-
 const runTurn = (text: string, session: SessionState) =>
   runIntent(text, session, { tools: TEST_TOOLS, planStore });
 
-const connectedSession: SessionState = {
-  ...emptySession,
-  watchAddress: testWallet,
-  walletAddress: testWallet,
-  chainId: 42161,
-  signerMode: "wallet",
-};
-
-describe("session — boot state", () => {
-  it("createSession() starts with every field null", () => {
-    const session = createSession().get();
-    assert.deepEqual(session, emptySession);
+describe("runIntent shell state", () => {
+  it("createSession starts with the Turnkey agent-wallet model", () => {
+    assert.deepEqual(createSession().get(), emptySession);
   });
-});
 
-describe("runIntent — shell-level intents do not touch the runtime", () => {
-  it("help returns no result and bumps lastIntent", async () => {
+  it("handles shell-level help without runtime execution", async () => {
     const run = await runTurn("help", emptySession);
     assert.equal(run.intent.intent, "help");
     assert.equal(run.result, undefined);
     assert.equal(run.session.lastIntent, "help");
   });
 
-  it("exit returns no result and bumps lastIntent", async () => {
-    const run = await runTurn("quit", emptySession);
-    assert.equal(run.intent.intent, "exit");
-    assert.equal(run.result, undefined);
-    assert.equal(run.session.lastIntent, "exit");
-  });
-
-  it("gibberish becomes needs_clarification, not a runtime call", async () => {
-    const run = await runTurn("xyzzy frobnicate", emptySession);
+  it("does not treat a bare wallet address as the main product path", async () => {
+    const run = await runTurn("0xabcdef0123456789abcdef0123456789abcdef01", emptySession);
     assert.equal(run.intent.intent, "needs_clarification");
     assert.equal(run.result, undefined);
-    assert.match(run.intent.clarification ?? "", /try/iu);
+    assert.equal(run.session.agentWalletAddress, null);
   });
 });
 
-describe("runIntent — actionable intents go through the runtime", () => {
-  it("inspect_position with id returns a result and updates session", async () => {
-    const run = await runTurn("inspect position 42", {
-      ...emptySession,
-      watchAddress: testWallet,
-      chainId: 42161,
-    });
-    assert.equal(run.intent.intent, "inspect_position");
-    assert.ok(run.result, "expected a runtime result");
-    assert.equal(run.result?.tool, "inspectPosition");
+describe("runIntent agent wallet lifecycle", () => {
+  it("creates the Zuno wallet and stores it in session", async () => {
+    const run = await runTurn("create my zuno wallet", emptySession);
+    assert.equal(run.intent.intent, "create_agent_wallet");
+    assert.equal(run.result?.tool, "createAgentWallet");
     assert.equal(run.result?.status, "success");
-    assert.equal(run.session.lastPositionId, "42");
-    assert.equal(run.session.lastIntent, "inspect_position");
+    assert.equal(run.session.agentWalletAddress, agentWallet);
+    assert.equal(run.session.chainId, 8453);
   });
 
-  it("connect_wallet adopts wallet fields from the runtime outcome", async () => {
-    const run = await runTurn("connect my wallet", emptySession);
-    assert.equal(run.result?.tool, "connectWallet");
+  it("shows the current Zuno wallet", async () => {
+    const run = await runTurn("show my zuno wallet", sessionWithWallet());
+    assert.equal(run.intent.intent, "show_agent_wallet");
+    assert.equal(run.result?.tool, "showAgentWallet");
     assert.equal(run.result?.status, "success");
-    assert.match(run.session.watchAddress ?? "", /^0x[a-f0-9]{40}$/iu);
-    assert.equal(run.session.walletAddress, null);
-    assert.equal(run.session.signerMode, null);
   });
 
-  it("show positions for an address sets read-only watch target without wallet connection", async () => {
-    const run = await runTurn(`show positions for ${testWallet}`, emptySession);
+  it("shows Zuno wallet balance and funding guidance", async () => {
+    const balance = await runTurn("what's my zuno wallet balance", sessionWithWallet());
+    assert.equal(balance.result?.tool, "showAgentWalletBalance");
+    assert.equal(balance.result?.status, "success");
+
+    const fund = await runTurn("fund my zuno wallet", sessionWithWallet());
+    assert.equal(fund.result?.tool, "fundAgentWallet");
+    assert.equal(fund.result?.status, "success");
+  });
+});
+
+describe("runIntent LP workflow", () => {
+  it("lists positions for the Zuno wallet", async () => {
+    const run = await runTurn("inspect my positions", sessionWithWallet());
     assert.equal(run.intent.intent, "list_positions");
-    assert.equal(run.result?.tool, "listWalletPositions");
-    assert.equal(run.result?.status, "success");
-    assert.equal(run.session.watchAddress, testWallet.toLowerCase());
-    assert.equal(run.session.walletAddress, null);
-  });
-
-  it("a bare address starts read-only position analysis", async () => {
-    const run = await runTurn(testWallet, emptySession);
-    assert.equal(run.intent.intent, "list_positions");
-    assert.equal(run.result?.tool, "listWalletPositions");
-    assert.equal(run.result?.status, "success");
-    assert.equal(run.session.watchAddress, testWallet.toLowerCase());
-    assert.equal(run.session.chainId, 42161);
-  });
-
-  it("what's my wallet address shows the watch target, not token balance", async () => {
-    const run = await runTurn("what's my wallet address", {
-      ...emptySession,
-      watchAddress: testWallet,
-      chainId: 42161,
-    });
-    assert.equal(run.intent.intent, "show_watch_target");
-    assert.equal(run.result?.tool, "showWatchTarget");
+    assert.equal(run.result?.tool, "listAgentWalletPositions");
     assert.equal(run.result?.status, "success");
   });
 
-  it("my wallet address also shows the watch target", async () => {
-    const run = await runTurn("my wallet address", {
-      ...emptySession,
-      watchAddress: testWallet,
-      chainId: 42161,
-    });
-    assert.equal(run.intent.intent, "show_watch_target");
-    assert.equal(run.result?.tool, "showWatchTarget");
-    assert.equal(run.result?.status, "success");
+  it("threads inspect, recommend, diff, simulate, approve, apply", async () => {
+    let current = sessionWithWallet();
+
+    const inspected = await runTurn("inspect position 42", current);
+    assert.equal(inspected.result?.tool, "inspectPosition");
+    assert.equal(inspected.session.lastPositionId, "42");
+    current = inspected.session;
+
+    const recommended = await runTurn("recommend what I should do with this position", current);
+    assert.equal(recommended.result?.tool, "recommendRebalance");
+    assert.match(recommended.session.lastPlanId ?? "", /^plan_/u);
+    assert.equal(recommended.session.executionState, "drafted");
+    current = recommended.session;
+
+    const diff = await runTurn("show me the diff", current);
+    assert.equal(diff.result?.tool, "showPlanDiff");
+    assert.equal(diff.result?.status, "success");
+    current = diff.session;
+
+    const simulated = await runTurn("simulate it", current);
+    assert.equal(simulated.result?.tool, "simulatePlan");
+    assert.equal(simulated.session.executionState, "simulated");
+    current = simulated.session;
+
+    const approved = await runTurn("approve it", current);
+    assert.equal(approved.result?.tool, "approvePlan");
+    assert.equal(approved.session.approvalState, "approved");
+    current = approved.session;
+
+    const applied = await runTurn("apply it", current);
+    assert.equal(applied.result?.tool, "applyPlan");
+    assert.equal(applied.result?.status, "success");
+    assert.equal(applied.session.executionState, "submitted");
   });
 
-  it("filler text plus wallet address starts read-only analysis", async () => {
-    const run = await runTurn(`here my wallet ${testWallet}`, emptySession);
-    assert.equal(run.intent.intent, "list_positions");
-    assert.equal(run.result?.tool, "listWalletPositions");
-    assert.equal(run.result?.status, "success");
-    assert.equal(run.session.watchAddress, testWallet.toLowerCase());
-  });
-
-  it("create position returns a specific product-boundary message", async () => {
-    const run = await runTurn("create position", emptySession);
-    assert.equal(run.intent.intent, "create_position");
-    assert.equal(run.result?.tool, "createPosition");
+  it("blocks apply before approval", async () => {
+    const recommended = await runTurn(
+      "recommend what I should do with position 42",
+      sessionWithWallet(),
+    );
+    const run = await runTurn("apply it", recommended.session);
+    assert.equal(run.intent.intent, "apply_plan");
     assert.equal(run.result?.status, "error");
-    assert.match(run.result?.message ?? "", /does not create/iu);
+    assert.equal(run.result?.errorCode, "APPROVAL_REQUIRED");
   });
+});
 
-  it("standalone swaps return a specific product-boundary message", async () => {
-    const run = await runTurn("need t swap some eth to usdc", emptySession);
+describe("runIntent product boundaries", () => {
+  it("keeps standalone swaps outside the focused LP flow", async () => {
+    const run = await runTurn("need t swap some eth to usdc", sessionWithWallet());
     assert.equal(run.intent.intent, "swap_tokens");
     assert.equal(run.result?.tool, "swapTokens");
     assert.equal(run.result?.status, "error");
-    assert.match(run.result?.message ?? "", /standalone swaps/iu);
   });
 
-  it("can you look at my LPs lists positions", async () => {
-    const run = await runTurn("can you look at my LPs", {
-      ...emptySession,
-      watchAddress: testWallet,
-      chainId: 42161,
-    });
-    assert.equal(run.intent.intent, "list_positions");
-    assert.equal(run.result?.tool, "listWalletPositions");
-    assert.equal(run.result?.status, "success");
-  });
-
-  it("'I pasted my wallet' reuses the watch address", async () => {
-    const run = await runTurn("I pasted my wallet", {
-      ...emptySession,
-      watchAddress: testWallet,
-      chainId: 42161,
-    });
-    assert.equal(run.intent.intent, "list_positions");
-    assert.equal(run.result?.status, "success");
-  });
-
-  it("recommend_rebalance writes the new planId to session", async () => {
-    const run = await runTurn("recommend what I should do with position 43", connectedSession);
-    assert.equal(run.result?.tool, "recommendRebalance");
-    assert.equal(run.result?.status, "success");
-    assert.match(run.session.lastPlanId ?? "", /^plan_/u);
-  });
-
-  it("show_diff falls through session.lastPlanId via the runtime", async () => {
-    const recommended = await runTurn(
-      "recommend what I should do with position 42",
-      connectedSession,
-    );
-    const run = await runTurn("show me the diff", recommended.session);
-    assert.equal(run.result?.tool, "showPlanDiff");
-    assert.equal(run.result?.status, "success");
-    assert.equal(run.session.lastPlanId, recommended.session.lastPlanId);
-  });
-});
-
-describe("runIntent — runtime errors are preserved on the result", () => {
-  it("apply_plan with no plan returns a structured error", async () => {
-    const run = await runTurn("apply plan_abc", emptySession);
-    assert.equal(run.intent.intent, "apply_plan");
+  it("keeps brand-new LP creation out of current scope", async () => {
+    const run = await runTurn("create position", sessionWithWallet());
+    assert.equal(run.intent.intent, "create_position");
+    assert.equal(run.result?.tool, "createPosition");
     assert.equal(run.result?.status, "error");
-    assert.equal(run.result?.errorCode, "PLAN_NOT_FOUND");
-  });
-
-  it("apply_plan with plan succeeds without pre-connected wallet", async () => {
-    const recommended = await runTurn(
-      "recommend what I should do with position 42",
-      connectedSession,
-    );
-    const run = await runTurn("apply it", {
-      ...recommended.session,
-      walletAddress: null,
-      signerMode: null,
-    });
-    assert.equal(run.intent.intent, "apply_plan");
-    assert.equal(run.result?.tool, "applyPlan");
-    assert.equal(run.result?.status, "success");
-    assert.equal(run.session.lastPlanId, recommended.session.lastPlanId);
-    assert.equal(run.session.signerMode, null);
-  });
-});
-
-describe("runIntent — multi-turn continuity", () => {
-  it("threads a session across inspect → recommend → diff → simulate → apply", async () => {
-    let session = connectedSession;
-
-    const r1 = await runTurn("inspect position 42", session);
-    assert.equal(r1.intent.intent, "inspect_position");
-    assert.equal(r1.session.lastPositionId, "42");
-    session = r1.session;
-
-    const r2 = await runTurn("recommend what I should do with this position", session);
-    assert.equal(r2.intent.intent, "recommend_rebalance");
-    assert.equal(r2.intent.positionId, "42");
-    assert.equal(r2.result?.tool, "recommendRebalance");
-    assert.match(r2.session.lastPlanId ?? "", /^plan_/u);
-    const planId = r2.session.lastPlanId!;
-    session = r2.session;
-
-    const r3 = await runTurn("show me the diff", session);
-    assert.equal(r3.intent.intent, "show_diff");
-    assert.equal(r3.result?.tool, "showPlanDiff");
-    assert.equal(r3.session.lastPlanId, planId);
-    session = r3.session;
-
-    const r4 = await runTurn("simulate it", session);
-    assert.equal(r4.intent.intent, "simulate_plan");
-    assert.equal(r4.result?.tool, "simulatePlan");
-    assert.equal(r4.session.lastPlanId, planId);
-    session = r4.session;
-
-    const r5 = await runTurn("apply it with my wallet", session);
-    assert.equal(r5.intent.intent, "apply_plan");
-    assert.equal(r5.result?.tool, "applyPlan");
-    assert.equal(r5.result?.status, "success");
-    assert.equal(r5.session.lastPlanId, planId);
-    assert.equal(r5.session.signerMode, "wallet");
-  });
-
-  it("keeps session stable when a turn fails to resolve a reference", async () => {
-    const before: SessionState = { ...emptySession };
-    const run = await runTurn("inspect", before);
-    assert.equal(run.intent.intent, "needs_clarification");
-    assert.equal(run.result, undefined);
-    assert.equal(run.session.lastPositionId, null);
-    assert.equal(run.session.lastPlanId, null);
-    assert.equal(run.session.lastIntent, "needs_clarification");
   });
 });
 
 const TEST_TOOLS: ToolRegistry = [
   {
-    name: "connectWallet",
-    intents: ["connect_wallet"],
+    name: "createAgentWallet",
+    intents: ["create_agent_wallet"],
     execute: () => ({
-      tool: "connectWallet",
+      tool: "createAgentWallet",
       status: "success",
-      message: "Read target configured.",
+      message: "Zuno wallet ready.",
+      data: agentWalletData("created"),
+    }),
+  },
+  {
+    name: "showAgentWallet",
+    intents: ["show_agent_wallet"],
+    execute: () => ({
+      tool: "showAgentWallet",
+      status: "success",
+      message: "Zuno wallet loaded.",
+      data: agentWalletData("attached"),
+    }),
+  },
+  {
+    name: "showAgentWalletBalance",
+    intents: ["show_agent_wallet_balance"],
+    execute: () => ({
+      tool: "showAgentWalletBalance",
+      status: "success",
+      message: "Balance loaded.",
       data: {
-        watchAddress: testWallet,
-        walletAddress: null,
-        chainId: 42161,
-        chainName: "Arbitrum",
-        signerMode: null,
+        agentWalletAddress: agentWallet,
+        chainId: 8453,
+        chainName: "Base",
+        native: { symbol: "ETH", amount: "0.25" },
+        funded: true,
       },
     }),
   },
   {
-    name: "showWatchTarget",
-    intents: ["show_watch_target"],
-    execute: (intent, context) => ({
-      tool: "showWatchTarget",
+    name: "fundAgentWallet",
+    intents: ["fund_agent_wallet"],
+    execute: () => ({
+      tool: "fundAgentWallet",
       status: "success",
-      message: "Watch target loaded.",
+      message: "Funding instructions.",
       data: {
-        watchAddress: intent.walletAddress ?? context.session.watchAddress,
-        walletAddress: context.session.walletAddress,
-        chainId: context.session.chainId ?? 42161,
-        chainName: "Arbitrum",
-        signerMode: context.session.signerMode,
-        execution: "read_only",
+        agentWalletAddress: agentWallet,
+        userWalletAddress: null,
+        chainId: 8453,
+        status: "ready",
+        instructions: [`send funds to ${agentWallet}`],
       },
     }),
   },
   {
-    name: "listWalletPositions",
+    name: "listAgentWalletPositions",
     intents: ["list_positions"],
-    execute: (intent) => ({
-      tool: "listWalletPositions",
+    execute: () => ({
+      tool: "listAgentWalletPositions",
       status: "success",
-      message: "Loaded positions.",
+      message: "Positions loaded.",
       data: {
-        watchAddress: intent.walletAddress ?? testWallet,
-        walletAddress: intent.walletAddress ?? testWallet,
-        chainId: 42161,
-        positions: [
-          { positionId: "42", pair: "WETH/USDC", feeTier: 500 },
-          { positionId: "43", pair: "WETH/USDC", feeTier: 500 },
-        ],
+        agentWalletAddress: agentWallet,
+        chainId: 8453,
+        positions: [{ positionId: "42", pair: "WETH/USDC", feeTier: 500 }],
       },
     }),
   },
   {
     name: "inspectPosition",
     intents: ["inspect_position"],
-    execute: (intent, context) => {
-      const positionId = intent.positionId ?? context.session.lastPositionId ?? "42";
-      return {
-        tool: "inspectPosition",
-        status: "success",
-        message: "Position loaded.",
-        data: inspectData(positionId),
-      };
-    },
+    execute: (intent) => ({
+      tool: "inspectPosition",
+      status: "success",
+      message: "Position loaded.",
+      data: inspectData(intent.positionId ?? "42"),
+    }),
   },
   {
     name: "recommendRebalance",
@@ -407,35 +292,84 @@ const TEST_TOOLS: ToolRegistry = [
     },
   },
   {
-    name: "applyPlan",
-    intents: ["apply_plan"],
+    name: "approvePlan",
+    intents: ["approve_plan"],
     execute: async (intent, context) => {
       const planId = intent.planId ?? context.session.lastPlanId;
       const plan = planId ? await context.planStore?.get(planId) : null;
       return plan
         ? {
-            tool: "applyPlan",
+            tool: "approvePlan",
             status: "success",
-            message: "Wallet approval required.",
+            message: "Approved.",
             data: {
               planId: plan.id,
               positionId: plan.positionId,
-              signerMode: intent.signerMode ?? "wallet",
-              status: "requires_wallet_signature",
-              approval: {
-                kind: "walletconnect_qr",
-                status: "requires_project_id",
-                uri: null,
-                instructions: [],
-              },
+              agentWalletAddress: agentWallet,
+              approvalState: "approved",
+              executionState: "approved",
+              summary: "approved test plan",
+              warnings: [],
             },
           }
         : {
-            tool: "applyPlan",
+            tool: "approvePlan",
             status: "error",
             message: "Plan was not found.",
             errorCode: "PLAN_NOT_FOUND",
           };
+    },
+  },
+  {
+    name: "applyPlan",
+    intents: ["apply_plan"],
+    execute: async (intent, context) => {
+      const planId = intent.planId ?? context.session.lastPlanId;
+      const plan = planId ? await context.planStore?.get(planId) : null;
+      if (!plan) {
+        return {
+          tool: "applyPlan",
+          status: "error",
+          message: "Plan was not found.",
+          errorCode: "PLAN_NOT_FOUND",
+        };
+      }
+      if (context.session.approvalState !== "approved") {
+        return {
+          tool: "applyPlan",
+          status: "error",
+          message: "Approval required.",
+          errorCode: "APPROVAL_REQUIRED",
+        };
+      }
+      return {
+        tool: "applyPlan",
+        status: "success",
+        message: "Submitted through Turnkey.",
+        data: {
+          planId: plan.id,
+          positionId: plan.positionId,
+          agentWalletAddress: agentWallet,
+          approvalState: "approved",
+          executionState: "submitted",
+          status: "submitted",
+          summary: "submitted",
+          pair: "WETH/USDC",
+          feeTier: 500,
+          oldRange: { priceLower: 1, priceUpper: 2 },
+          newRange: { priceLower: 1.1, priceUpper: 2.1 },
+          residual: { token0: "0", token1: "0" },
+          estimatedGas: "350000",
+          estimatedGasUsd: 0.01,
+          estimatedSlippage: 0.001,
+          verdict: "approve",
+          confidence: 0.9,
+          reasons: ["approved by risk"],
+          warnings: [],
+          signer: "turnkey",
+          turnkeyActivityId: "act_test",
+        },
+      };
     },
   },
   {
@@ -460,16 +394,25 @@ const TEST_TOOLS: ToolRegistry = [
   },
 ];
 
-const token0: Token = {
-  address: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
-  symbol: "WETH",
-  decimals: 18,
-};
-const token1: Token = {
-  address: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-  symbol: "USDC",
-  decimals: 6,
-};
+function sessionWithWallet(): SessionState {
+  return {
+    ...emptySession,
+    agentWalletAddress: agentWallet,
+    chainId: 8453,
+  };
+}
+
+function agentWalletData(status: string) {
+  return {
+    agentWalletAddress: agentWallet,
+    userWalletAddress: null,
+    chainId: 8453,
+    chainName: "Base",
+    provider: "turnkey",
+    status,
+    walletId: "wallet_test",
+  };
+}
 
 function inspectData(positionId: string) {
   const snapshot = buildSnapshot(position(positionId));
@@ -488,18 +431,26 @@ function position(id: string): Position {
   const currentTick = -198_330;
   return {
     id,
-    owner: testWallet,
+    owner: agentWallet,
     pool: {
-      address: "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
-      chainId: 42161,
-      token0,
-      token1,
+      address: "0x2222222222222222222222222222222222222222" as Address,
+      chainId: 8453,
+      token0: {
+        address: "0x4200000000000000000000000000000000000006" as Address,
+        symbol: "WETH",
+        decimals: 18,
+      },
+      token1: {
+        address: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913" as Address,
+        symbol: "USDC",
+        decimals: 6,
+      },
       feeTier: 500,
       tickSpacing: 10,
       currentTick,
       sqrtPriceX96: "0",
       liquidity: "12345678901234567890",
-      price: tickToPrice(currentTick, token0.decimals, token1.decimals),
+      price: tickToPrice(currentTick, 18, 6),
     },
     tickLower: -199_400,
     tickUpper: -198_400,
