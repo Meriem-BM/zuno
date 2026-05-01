@@ -1,18 +1,27 @@
-import { AxlClient, shortPeer } from "@zuno/axl";
-import type { ToolDefinition } from "../contracts/types.js";
-import { err, ok } from "./shared.js";
+import { AxlClient, peerIdFor, shortPeer, type AxlRole } from "@zuno/strategy/axl";
+import type { ToolDefinition } from "../../contracts/types.js";
+import { err, ok } from "../shared.js";
+
+const ROLES: AxlRole[] = ["watcher", "planner", "risk"];
 
 const showAgentStatus: ToolDefinition = {
   name: "showAgentStatus",
   intents: ["agent_status"],
   execute: async () => {
     try {
-      const peers = await new AxlClient({ role: "cli" }).topology();
-      const roles = new Set(peers.peers.map((peer) => peer.role));
+      const topology = await new AxlClient({ role: "cli" }).topology();
+      const visible = new Set(topology.peers);
+      const status = (role: AxlRole): "online" | "offline" => {
+        try {
+          return visible.has(peerIdFor(role)) ? "online" : "offline";
+        } catch {
+          return "offline";
+        }
+      };
       return ok("showAgentStatus", "Agent topology loaded.", {
-        watcher: { status: roles.has("watcher") ? "online" : "offline" },
-        planner: { status: roles.has("planner") ? "online" : "offline" },
-        risk: { status: roles.has("risk") ? "online" : "offline" },
+        watcher: { status: status("watcher") },
+        planner: { status: status("planner") },
+        risk: { status: status("risk") },
       });
     } catch (error) {
       return err(
@@ -30,10 +39,20 @@ const showPeers: ToolDefinition = {
   execute: async () => {
     try {
       const topology = await new AxlClient({ role: "cli" }).topology();
+      const visible = new Set(topology.peers);
+      const matched = ROLES.flatMap((role) => {
+        try {
+          const id = peerIdFor(role);
+          return visible.has(id) ? [{ role, peerId: id }] : [];
+        } catch {
+          return [];
+        }
+      });
       return ok("showPeers", `${topology.peers.length} peers connected.`, {
-        peers: topology.peers.map((peer) => ({
-          peerId: shortPeer(peer.peerId),
-          role: peer.role,
+        ourPublicKey: topology.ourPublicKey,
+        peers: matched.map((entry) => ({
+          peerId: shortPeer(entry.peerId),
+          role: entry.role,
         })),
       });
     } catch (error) {

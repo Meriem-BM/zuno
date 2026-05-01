@@ -6,9 +6,9 @@ import {
   pairName,
   rangeStatus,
   riskReason,
-} from "@zuno/uniswap";
-import type { InspectPositionData, ToolDefinition } from "../contracts/types.js";
-import { err, missingReadTarget, ok, resolvePositionId, resolveReadTarget } from "./shared.js";
+} from "@zuno/chain/uniswap";
+import type { InspectPositionData, ToolDefinition } from "../../contracts/types.js";
+import { err, missingAgentWallet, ok, resolvePositionId, resolveAgentWallet } from "../shared.js";
 
 const inspectPosition: ToolDefinition = {
   name: "inspectPosition",
@@ -18,8 +18,8 @@ const inspectPosition: ToolDefinition = {
     if (!positionId) {
       return err("inspectPosition", "POSITION_NOT_FOUND", "No position id provided.");
     }
-    const target = resolveReadTarget(intent, ctx);
-    if (!target) return missingReadTarget("inspectPosition");
+    const target = resolveAgentWallet(ctx);
+    if (!target) return missingAgentWallet("inspectPosition");
     try {
       const position = await getPosition(positionId, {
         owner: target.address,
@@ -40,8 +40,8 @@ const inspectAllPositions: ToolDefinition = {
   name: "inspectAllPositions",
   intents: ["inspect_all_positions"],
   execute: async (intent, ctx) => {
-    const target = resolveReadTarget(intent, ctx);
-    if (!target) return missingReadTarget("inspectAllPositions");
+    const target = resolveAgentWallet(ctx);
+    if (!target) return missingAgentWallet("inspectAllPositions");
     try {
       const positions = await listPositions(target.address, { chainId: target.chainId });
       return ok("inspectAllPositions", `Loaded ${positions.length} positions.`, {
@@ -61,8 +61,8 @@ const checkRangeStatus: ToolDefinition = {
     if (!positionId) {
       return err("checkRangeStatus", "POSITION_NOT_FOUND", "No position id provided.");
     }
-    const target = resolveReadTarget(intent, ctx);
-    if (!target) return missingReadTarget("checkRangeStatus");
+    const target = resolveAgentWallet(ctx);
+    if (!target) return missingAgentWallet("checkRangeStatus");
     try {
       const position = await getPosition(positionId, {
         owner: target.address,
@@ -84,8 +84,8 @@ const listOutOfRangePositions: ToolDefinition = {
   name: "listOutOfRangePositions",
   intents: ["list_out_of_range_positions"],
   execute: async (intent, ctx) => {
-    const target = resolveReadTarget(intent, ctx);
-    if (!target) return missingReadTarget("listOutOfRangePositions");
+    const target = resolveAgentWallet(ctx);
+    if (!target) return missingAgentWallet("listOutOfRangePositions");
     try {
       const positions = await listPositions(target.address, { chainId: target.chainId });
       const out = positions
@@ -108,8 +108,8 @@ const listRiskyPositions: ToolDefinition = {
   name: "listRiskyPositions",
   intents: ["list_risky_positions"],
   execute: async (intent, ctx) => {
-    const target = resolveReadTarget(intent, ctx);
-    if (!target) return missingReadTarget("listRiskyPositions");
+    const target = resolveAgentWallet(ctx);
+    if (!target) return missingAgentWallet("listRiskyPositions");
     try {
       const positions = await listPositions(target.address, { chainId: target.chainId });
       const risky = positions.map((position) => buildSnapshot(position)).filter(isRiskyPosition);

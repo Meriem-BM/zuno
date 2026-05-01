@@ -1,18 +1,22 @@
 import type {
   ErrorCode,
-  ConnectWalletData,
   ExecutionContext,
+  NeedsConfirmationData,
   ToolExecutionResult,
   ToolName,
 } from "../contracts/types.js";
-import { chainName, configuredWatchAddress, defaultChainId } from "@zuno/config";
+import { chainName, defaultChainId } from "@zuno/chain/config";
 import type { Address, ChainId } from "@zuno/core";
 
 export function ok<T>(tool: ToolName, message: string, data: T): ToolExecutionResult<T> {
   return { tool, status: "success", message, data };
 }
 
-export function err(tool: ToolName, errorCode: ErrorCode, message: string): ToolExecutionResult {
+export function err<T = never>(
+  tool: ToolName,
+  errorCode: ErrorCode,
+  message: string,
+): ToolExecutionResult<T> {
   return { tool, status: "error", message, errorCode };
 }
 
@@ -30,51 +34,35 @@ export function resolvePlanId(
   return intent.planId ?? ctx.session.lastPlanId ?? undefined;
 }
 
-export function connectedWallet(ctx: ExecutionContext): ConnectWalletData | null {
-  if (!ctx.session.walletAddress || !ctx.session.chainId) return null;
-  return {
-    watchAddress: ctx.session.watchAddress ?? ctx.session.walletAddress,
-    walletAddress: ctx.session.walletAddress,
-    chainId: ctx.session.chainId,
-    chainName: `Chain ${ctx.session.chainId}`,
-    signerMode: ctx.session.signerMode ?? "wallet",
-  };
-}
-
 export interface ReadTarget {
   address: Address;
   chainId: ChainId;
   chainName: string;
-  source: "input" | "session" | "env" | "wallet";
+  source: "agent_wallet";
 }
 
-export function resolveReadTarget(
-  intent: { walletAddress?: string },
-  ctx: ExecutionContext,
-): ReadTarget | null {
-  const envAddress = configuredWatchAddress();
-  const inputAddress = intent.walletAddress as Address | undefined;
-  const address =
-    inputAddress ?? ctx.session.watchAddress ?? envAddress ?? ctx.session.walletAddress;
+export function resolveAgentWallet(ctx: ExecutionContext): ReadTarget | null {
+  const address = ctx.session.agentWalletAddress;
   if (!address) return null;
-
-  const source = inputAddress
-    ? "input"
-    : ctx.session.watchAddress
-      ? "session"
-      : envAddress
-        ? "env"
-        : "wallet";
   const chainId = ctx.session.chainId ?? defaultChainId();
-  return { address, chainId, chainName: chainName(chainId), source };
+  return { address, chainId, chainName: chainName(chainId), source: "agent_wallet" };
 }
 
-export function missingReadTarget(tool: ToolName): ToolExecutionResult {
+export function missingAgentWallet<T = never>(tool: ToolName): ToolExecutionResult<T> {
   return err(
     tool,
-    "WATCH_ADDRESS_NOT_SET",
-    'Paste a wallet address first, for example "show positions for 0x...".',
+    "AGENT_WALLET_NOT_FOUND",
+    'Create or attach your Zuno wallet first, for example "create my zuno wallet".',
   );
+}
+
+export function walletService(ctx: ExecutionContext) {
+  if (!ctx.walletService) {
+    throw new Error(
+      "Wallet service not configured; sign in with email OTP before invoking wallet tools.",
+    );
+  }
+  return ctx.walletService;
 }
 
 export function planStore(ctx: ExecutionContext) {
@@ -85,4 +73,17 @@ export function planStore(ctx: ExecutionContext) {
 export function alertStore(ctx: ExecutionContext) {
   if (!ctx.alertStore) throw new Error("alert store not configured");
   return ctx.alertStore;
+}
+
+export function preparedActionStore(ctx: ExecutionContext) {
+  if (!ctx.preparedActionStore) throw new Error("prepared action store not configured");
+  return ctx.preparedActionStore;
+}
+
+export function needsConfirmation<TSummary, TData = NeedsConfirmationData<TSummary>>(
+  tool: ToolName,
+  message: string,
+  data: TData,
+): ToolExecutionResult<TData> {
+  return { tool, status: "needs_confirmation", message, data };
 }

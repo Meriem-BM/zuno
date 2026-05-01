@@ -8,12 +8,16 @@ export interface PlanCandidate {
   tickUpper: number;
   priceLower: number;
   priceUpper: number;
-  // Estimated allocation of the user's existing capital
   deploy0: string;
   deploy1: string;
-  // Anything left over after deployment (often a swap residue)
   residual0: string;
   residual1: string;
+  required0?: string;
+  required1?: string;
+  shortfall0?: string;
+  shortfall1?: string;
+  slippageBps?: number;
+  prepAction?: string;
   rationale: string;
 }
 
@@ -38,10 +42,17 @@ export interface Plan {
 
 export interface PlanDiff {
   planId: string;
+  pair?: string;
+  token0?: { symbol: string; decimals: number };
+  token1?: { symbol: string; decimals: number };
   oldRange: { tickLower: number; tickUpper: number; priceLower: number; priceUpper: number };
   newRange: { tickLower: number; tickUpper: number; priceLower: number; priceUpper: number };
   current: { amount0: string; amount1: string };
   proposed: { amount0: string; amount1: string };
   residual: { amount0: string; amount1: string };
+  required?: { amount0: string; amount1: string };
+  shortfall?: { amount0: string; amount1: string };
+  prepAction?: string;
+  slippageBps?: number;
   riskNote: string;
 }

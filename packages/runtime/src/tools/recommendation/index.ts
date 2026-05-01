@@ -1,18 +1,18 @@
-import { AxlClient } from "@zuno/axl";
+import { AxlClient, peerIdFor } from "@zuno/strategy/axl";
 import type { AxlEnvelope, InspectRequest, Plan } from "@zuno/core";
 import { newRequestId } from "@zuno/core";
-import { loadRiskContext, proposeCandidates, recommendPlan } from "@zuno/planner";
-import { buildSnapshot, getPosition } from "@zuno/uniswap";
-import type { RecommendRebalanceData, ToolDefinition } from "../contracts/types.js";
+import { loadRiskContext, proposeCandidates, recommendPlan } from "@zuno/strategy/planner";
+import { buildSnapshot, getPosition } from "@zuno/chain/uniswap";
+import type { RecommendRebalanceData, ToolDefinition } from "../../contracts/types.js";
 import {
   err,
-  missingReadTarget,
+  missingAgentWallet,
   ok,
   planStore,
   resolvePlanId,
   resolvePositionId,
-  resolveReadTarget,
-} from "./shared.js";
+  resolveAgentWallet,
+} from "../shared.js";
 
 const recommendRebalance: ToolDefinition = {
   name: "recommendRebalance",
@@ -22,8 +22,8 @@ const recommendRebalance: ToolDefinition = {
     if (!positionId) {
       return err("recommendRebalance", "POSITION_NOT_FOUND", "No position id to rebalance.");
     }
-    const target = resolveReadTarget(intent, ctx);
-    if (!target) return missingReadTarget("recommendRebalance");
+    const target = resolveAgentWallet(ctx);
+    if (!target) return missingAgentWallet("recommendRebalance");
     try {
       const axlPlan = await recommendWithAxlIfAvailable(positionId, target.address, target.chainId);
       let plan;
@@ -63,8 +63,8 @@ const showRebalanceOptions: ToolDefinition = {
         "No position id to draft options for.",
       );
     }
-    const target = resolveReadTarget(intent, ctx);
-    if (!target) return missingReadTarget("showRebalanceOptions");
+    const target = resolveAgentWallet(ctx);
+    if (!target) return missingAgentWallet("showRebalanceOptions");
     try {
       const snapshot = buildSnapshot(
         await getPosition(positionId, {
@@ -134,6 +134,16 @@ function recommendationData(plan: Plan): RecommendRebalanceData {
         }
       : undefined,
     rejectReason: plan.rejectReason,
+    prepAction: plan.recommended.prepAction,
+    required: {
+      token0: plan.recommended.required0 ?? plan.recommended.deploy0,
+      token1: plan.recommended.required1 ?? plan.recommended.deploy1,
+    },
+    shortfall: {
+      token0: plan.recommended.shortfall0 ?? "0",
+      token1: plan.recommended.shortfall1 ?? "0",
+    },
+    slippageBps: plan.recommended.slippageBps,
     reason: plan.recommended.rationale,
     verdict: plan.risk.verdict,
     confidence: plan.risk.confidence,
@@ -153,10 +163,15 @@ async function recommendWithAxlIfAvailable(
   } catch {
     return null;
   }
-  const roles = new Set(topology.peers.map((peer) => peer.role));
-  if (!roles.has("watcher") || !roles.has("planner") || !roles.has("risk")) return null;
+  const visible = new Set(topology.peers);
+  try {
+    if (!visible.has(peerIdFor("watcher"))) return null;
+    if (!visible.has(peerIdFor("planner"))) return null;
+    if (!visible.has(peerIdFor("risk"))) return null;
+  } catch {
+    return null;
+  }
 
-  await client.register();
   const requestId = newRequestId();
   const env: AxlEnvelope<InspectRequest> = {
     requestId,

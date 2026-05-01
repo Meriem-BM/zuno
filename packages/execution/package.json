@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@zuno/chain": "workspace:*",
     "@zuno/core": "workspace:*"
   },
   "devDependencies": {

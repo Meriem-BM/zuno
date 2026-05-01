@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
-import type { Plan } from "@zuno/core";
+import { afterEach, describe, it } from "node:test";
+import type { Address, Plan } from "@zuno/core";
 import { prepareApply, simulatePlan } from "../src/index.js";
+
+const agentWallet = "0xabc1230000000000000000000000000000000def" as Address;
 
 const plan: Plan = {
   id: "plan_test",
@@ -69,22 +71,55 @@ const plan: Plan = {
 };
 
 describe("execution preview", () => {
+  afterEach(() => {
+    delete process.env.ZUNO_UNISWAP_REBALANCE_CALLDATA;
+  });
+
   it("simulates deterministic steps before apply", async () => {
-    const simulation = simulatePlan(plan);
+    const simulation = await simulatePlan(plan);
     assert.equal(simulation.canApply, true);
     assert.ok(simulation.steps.length >= 4);
     assert.ok(simulation.warnings.some((warning) => /out of range/iu.test(warning)));
+    assert.equal(simulation.onchainStatus, "not_checked");
   });
 
-  it("prepares wallet signing without submitting from the terminal", async () => {
-    const preview = prepareApply(plan, "wallet");
-    assert.equal(preview.status, "requires_wallet_signature");
-    assert.match(preview.summary, /wallet/iu);
+  it("prepares a Turnkey-ready multicall via the deterministic builder", async () => {
+    const preview = await prepareApply(plan, agentWallet);
+    assert.equal(preview.status, "ready_for_turnkey");
+    assert.equal(preview.policy.allowed, true);
+    assert.equal(preview.transaction?.from, agentWallet);
+    // multicall(bytes[]) selector is 0xac9650d8
+    assert.ok(preview.transaction?.data.startsWith("0xac9650d8"), "expected multicall selector");
   });
 
-  it("blocks enclave mode until authority is configured", async () => {
-    const preview = prepareApply(plan, "enclave");
+  it("honors the dev override when ZUNO_UNISWAP_REBALANCE_CALLDATA is set", async () => {
+    process.env.ZUNO_UNISWAP_REBALANCE_CALLDATA = "0x1234";
+    const preview = await prepareApply(plan, agentWallet);
+    assert.equal(preview.status, "ready_for_turnkey");
+    assert.equal(preview.transaction?.data, "0x1234");
+  });
+
+  it("blocks when liquidity is zero so no rebalance can be built", async () => {
+    const zero = {
+      ...plan,
+      snapshot: { ...plan.snapshot, position: { ...plan.snapshot.position, liquidity: "0" } },
+    };
+    const preview = await prepareApply(zero, agentWallet);
     assert.equal(preview.status, "blocked");
-    assert.ok(preview.warnings.some((warning) => /enclave/iu.test(warning)));
+    assert.ok(preview.warnings.some((warning) => /could not build/iu.test(warning)));
+  });
+
+  it("blocks plans that require inventory prep", async () => {
+    const shortfall: Plan = {
+      ...plan,
+      recommended: {
+        ...plan.recommended,
+        shortfall0: "1",
+        prepAction: "Prep needed before execution: acquire WETH.",
+      },
+    };
+    const preview = await prepareApply(shortfall, agentWallet);
+    assert.equal(preview.status, "blocked");
+    assert.ok(preview.warnings.some((warning) => /prep needed|inventory prep/iu.test(warning)));
   });
 });
