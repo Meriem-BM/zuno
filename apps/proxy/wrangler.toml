@@ -1,0 +1,14 @@
+name = "zuno-auth"
+main = "src/index.ts"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Set with `wrangler secret put TURNKEY_API_PRIVATE_KEY` etc.
+# These are NEVER bundled in the source.
+#   TURNKEY_API_BASE_URL    = "https://api.turnkey.com"
+#   TURNKEY_ORGANIZATION_ID = "..."
+#   TURNKEY_API_PUBLIC_KEY  = "..."
+#   TURNKEY_API_PRIVATE_KEY = "..."
+
+[observability]
+enabled = true
