@@ -1,0 +1,31 @@
+{
+  "name": "@zuno/chain",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./config": "./src/config/index.ts",
+    "./wallet": "./src/wallet/index.ts",
+    "./tokens": "./src/tokens/index.ts",
+    "./uniswap": "./src/uniswap/index.ts"
+  },
+  "scripts": {
+    "test": "tsx --test tests/**/*.test.ts",
+    "test:wallet": "tsx --test tests/wallet/*.test.ts",
+    "test:tokens": "tsx --test tests/tokens/*.test.ts",
+    "test:uniswap": "tsx --test tests/uniswap/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@turnkey/crypto": "^2.8.14",
+    "@turnkey/sdk-server": "^5.3.0",
+    "@zuno/core": "workspace:*",
+    "viem": "^2.48.4"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

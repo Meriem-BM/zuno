@@ -1,0 +1,116 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import type { Address, Token } from "@zuno/core";
+import {
+  buildApproveTransaction,
+  checkApprovalRequirement,
+  fetchBalances,
+  MAX_UINT256,
+  readAllowance,
+  type TokenReadClient,
+} from "../../src/tokens/index.js";
+
+const owner = "0x000000000000000000000000000000000000aaaa" as Address;
+const spender = "0x000000000000000000000000000000000000bbbb" as Address;
+const usdc: Token = {
+  address: "0xaf88d065e77c8cc2239327c5edb3a432268e5831" as Address,
+  symbol: "USDC",
+  decimals: 6,
+};
+
+const balanceClient: TokenReadClient = {
+  async getBalance() {
+    return 1_500_000_000_000_000_000n;
+  },
+  async multicall({ contracts }) {
+    return contracts.map(
+      (c) =>
+        ({
+          status: "success",
+          result: c.address.toLowerCase() === usdc.address.toLowerCase() ? 1_234_560_000n : 0n,
+        }) as { status: "success"; result: unknown },
+    );
+  },
+  async readContract() {
+    return 0n;
+  },
+};
+
+const allowanceClient = (allowanceWei: bigint): TokenReadClient => ({
+  async getBalance() {
+    return 0n;
+  },
+  async multicall() {
+    return [];
+  },
+  async readContract() {
+    return allowanceWei;
+  },
+});
+
+describe("@zuno/chain/tokens — balances", () => {
+  it("returns native + dedup'd ERC20 list", async () => {
+    const snap = await fetchBalances(owner, 42161, {
+      client: balanceClient,
+      extraTokens: [usdc],
+    });
+    assert.equal(snap.chainName, "Arbitrum");
+    assert.equal(snap.native.symbol, "ETH");
+    assert.equal(snap.native.amount, "1.5");
+    const usdcEntry = snap.tokens.find((t) => t.token.symbol === "USDC");
+    assert.ok(usdcEntry);
+    assert.equal(usdcEntry.amount, "1234.56");
+  });
+
+  it("dedupes when extraTokens overlap the whitelist", async () => {
+    const snap = await fetchBalances(owner, 42161, {
+      client: balanceClient,
+      extraTokens: [usdc],
+    });
+    const count = snap.tokens.filter(
+      (t) => t.token.address.toLowerCase() === usdc.address.toLowerCase(),
+    ).length;
+    assert.equal(count, 1);
+  });
+});
+
+describe("@zuno/chain/tokens — allowances + approve", () => {
+  it("reads and formats allowance", async () => {
+    const reading = await readAllowance(
+      { token: usdc, owner, spender, chainId: 42161 },
+      { client: allowanceClient(1_500_000n) },
+    );
+    assert.equal(reading.allowance, "1.5");
+    assert.equal(reading.sufficient, undefined);
+  });
+
+  it("flags sufficient when required amount provided", async () => {
+    const reading = await readAllowance(
+      { token: usdc, owner, spender, chainId: 42161 },
+      { client: allowanceClient(2_000_000n), requiredWei: 1_000_000n },
+    );
+    assert.equal(reading.sufficient, true);
+  });
+
+  it("checkApprovalRequirement detects shortfall", async () => {
+    const req = await checkApprovalRequirement(
+      { token: usdc, owner, spender, chainId: 42161 },
+      5_000_000n,
+      { client: allowanceClient(1_000_000n) },
+    );
+    assert.equal(req.needsApproval, true);
+  });
+
+  it("buildApproveTransaction encodes the approve selector and amount", () => {
+    const tx = buildApproveTransaction(usdc, spender, 5_000_000n, 42161);
+    assert.equal(tx.to, usdc.address);
+    assert.equal(tx.value, "0");
+    assert.ok(tx.data.startsWith("0x095ea7b3"));
+    assert.match(tx.description, /approve 5 USDC/u);
+  });
+
+  it("renders 'unlimited' for MAX_UINT256 approvals", () => {
+    const tx = buildApproveTransaction(usdc, spender, MAX_UINT256, 42161);
+    assert.match(tx.description, /unlimited USDC/u);
+  });
+});
