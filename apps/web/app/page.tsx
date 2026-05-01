@@ -7,7 +7,7 @@ import { WhyItMatters } from "./components/WhyItMatters";
 
 export default function Home() {
   return (
-    <main className="relative min-h-screen">
+    <main className="grain relative min-h-screen">
       <Nav />
       <Hero />
       <div className="hairline mx-auto w-full max-w-6xl px-8" />

@@ -6,26 +6,29 @@ description: The interactive shell workflow.
 ```
 zuno
 
-analyze wallet 0x...
-show positions for 0x...
+create my zuno wallet
+show my zuno wallet
+fund my zuno wallet
+inspect my positions
 inspect position <tokenId>
 recommend what I should do with this position
 show me the diff
 simulate it
+approve it
 apply it
-watch my wallet
 show alerts
 ```
 
 | intent       | summary                                                      |
 |--------------|--------------------------------------------------------------|
-| wallet       | Set or inspect the read-only watch target                    |
-| positions    | List Uniswap v3 NFT positions held by the watch address      |
+| wallet       | Create, inspect, fund, and check the Turnkey-backed Zuno wallet |
+| positions    | List Uniswap v3 NFT positions held by the Zuno wallet        |
 | inspect      | Print one position snapshot: range, current tick, status     |
 | recommend    | Run Watcher → Planner → Risk when AXL is online, else local  |
 | diff         | Re-render before/after range and inventory changes           |
 | simulate     | Preview deterministic execution steps before signing         |
-| apply        | Prepare QR wallet approval; no private keys in the terminal  |
+| approve      | Human approval before any state-changing action              |
+| apply        | Policy check, Turnkey signing, and transaction submission    |
 | monitor      | Inspect monitor setup and read alerts from the worker        |
 
 Plans are persisted to `~/.zuno/plans/<planId>.json` so `zuno diff` works

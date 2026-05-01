@@ -2,7 +2,7 @@ export function Architecture() {
   return (
     <section id="architecture" className="mx-auto w-full max-w-6xl px-8 py-32 sm:py-40">
       <div className="mb-16 flex items-baseline justify-between">
-        <h2 className="font-fraunces text-[34px] text-fg sm:text-[42px]">
+        <h2 className="font-fraunces text-[34px] tracking-[-0.01em] text-fg sm:text-[42px]">
           A small{" "}
           <em className="italic text-fg-2" style={{ fontStyle: "italic" }}>
             mesh,
@@ -20,14 +20,14 @@ export function Architecture() {
         </div>
         <div className="lg:col-span-5">
           <p className="text-[15.5px] leading-[1.7] text-fg-2">
-            Each agent runs as its own process and connects to its own{" "}
-            <span className="text-fg">AXL</span> node, Gensyn&apos;s peer-to-peer
-            Agent eXchange Layer. They reach each other by ed25519 peer id over an encrypted
-            overlay, with no central broker in the path.
+            Each agent runs as its own process and talks to its own{" "}
+            <span className="text-fg">AXL</span> node — Gensyn&apos;s peer-to-peer Agent eXchange
+            Layer. They reach each other by ed25519 peer id over an encrypted overlay. No central
+            broker.
           </p>
           <p className="mt-6 text-[15.5px] leading-[1.7] text-fg-2">
-            The CLI is just another peer. Calculations stay deterministic in TypeScript; the model
-            only routes, synthesises, and explains.
+            The CLI is just another peer. Tick math, candidate generation, and risk scoring stay
+            deterministic in TypeScript. The model only routes, synthesises, and explains.
           </p>
 
           <dl className="mt-10 grid grid-cols-2 gap-y-3 font-jetbrains text-[11.5px]">
@@ -39,6 +39,8 @@ export function Architecture() {
             <dd className="text-fg">ed25519 peer id</dd>
             <dt className="text-muted">determinism</dt>
             <dd className="text-fg">tick math in ts</dd>
+            <dt className="text-muted">signer</dt>
+            <dd className="text-fg">turnkey policy</dd>
           </dl>
         </div>
       </div>
@@ -47,11 +49,9 @@ export function Architecture() {
 }
 
 function Diagram() {
-  // Geometry
   const W = 720;
   const H = 360;
 
-  // Agent box centers
   const cliX = 90;
   const wX = 260;
   const pX = 430;
@@ -74,9 +74,18 @@ function Diagram() {
   const p = node(pX);
   const r = node(rX);
 
-  // AXL nodes (small dots beneath each agent)
-  const axl = (x: number) => ({ x, y: axlY });
-  const ax = [axl(cliX), axl(wX), axl(pX), axl(rX)];
+  const ax = [cliX, wX, pX, rX].map((x) => ({ x, y: axlY }));
+
+  // Single continuous path the request packet travels along:
+  // CLI → Watcher → Planner → Risk → back to CLI through the AXL mesh.
+  const flowPath = `
+    M ${cli.cx + boxW / 2} ${agentY}
+    L ${w.cx - boxW / 2} ${agentY}
+    M ${w.cx + boxW / 2} ${agentY}
+    L ${p.cx - boxW / 2} ${agentY}
+    M ${p.cx + boxW / 2} ${agentY}
+    L ${r.cx - boxW / 2} ${agentY}
+  `;
 
   return (
     <figure className="rounded-md border border-line bg-bg-2 p-6">
@@ -98,6 +107,11 @@ function Diagram() {
           >
             <path d="M0,0 L10,5 L0,10 z" fill="var(--color-pink)" />
           </marker>
+          <radialGradient id="packet-glow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="var(--color-pink)" stopOpacity="1" />
+            <stop offset="60%" stopColor="var(--color-pink)" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="var(--color-pink)" stopOpacity="0" />
+          </radialGradient>
         </defs>
 
         {/* Faint grid for textbook feel */}
@@ -124,6 +138,136 @@ function Diagram() {
               strokeWidth="0.5"
             />
           ))}
+        </g>
+
+        {/* Layer labels */}
+        <text
+          x="14"
+          y={agentY + 4}
+          fontFamily="var(--font-jetbrains)"
+          fontSize="9"
+          fill="var(--color-muted)"
+        >
+          agents
+        </text>
+        <text
+          x="14"
+          y={axlY + 4}
+          fontFamily="var(--font-jetbrains)"
+          fontSize="9"
+          fill="var(--color-muted)"
+        >
+          axl mesh
+        </text>
+
+        {/* AXL mesh — full mesh between the four nodes, with a gentle shimmer */}
+        {(() => {
+          const lines: React.ReactNode[] = [];
+          for (let i = 0; i < ax.length; i++) {
+            for (let j = i + 1; j < ax.length; j++) {
+              const a = ax[i]!;
+              const b = ax[j]!;
+              const mx = (a.x + b.x) / 2;
+              const my = a.y + Math.min(40, Math.abs(b.x - a.x) * 0.18);
+              lines.push(
+                <path
+                  key={`m${i}${j}`}
+                  d={`M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}`}
+                  fill="none"
+                  stroke="var(--color-line)"
+                  strokeWidth="1"
+                  className="mesh-shimmer"
+                  style={{ animationDelay: `${(i + j) * 0.4}s` }}
+                />,
+              );
+            }
+          }
+          return lines;
+        })()}
+
+        {/* Vertical hairlines from agent box down to its AXL node */}
+        {ax.map((a, i) => (
+          <line
+            key={`v${i}`}
+            x1={a.x}
+            y1={agentY + boxH / 2}
+            x2={a.x}
+            y2={a.y - 8}
+            stroke="var(--color-line)"
+            strokeWidth="1"
+            strokeDasharray="2 3"
+          />
+        ))}
+
+        {/* AXL nodes — small ringed dots */}
+        {ax.map((a, i) => (
+          <g key={`n${i}`}>
+            <circle
+              cx={a.x}
+              cy={a.y}
+              r="6.5"
+              fill="none"
+              stroke="var(--color-line)"
+              strokeWidth="1"
+            />
+            <circle
+              cx={a.x}
+              cy={a.y}
+              r="3"
+              fill="var(--color-pink)"
+              className="axl-pulse"
+              style={{ animationDelay: `${i * 0.45}s` }}
+            />
+            <text
+              x={a.x}
+              y={a.y + 24}
+              textAnchor="middle"
+              fontFamily="var(--font-jetbrains)"
+              fontSize="9"
+              fill="var(--color-muted)"
+            >
+              axl :{9002 + i * 10}
+            </text>
+            <text
+              x={a.x}
+              y={a.y + 38}
+              textAnchor="middle"
+              fontFamily="var(--font-jetbrains)"
+              fontSize="8"
+              fill="var(--color-faint)"
+            >
+              {peerId(i)}
+            </text>
+          </g>
+        ))}
+
+        {/* Sequential request arrows */}
+        <path
+          d={`M ${cli.cx + boxW / 2} ${agentY} L ${w.cx - boxW / 2} ${agentY}`}
+          stroke="var(--color-pink)"
+          strokeWidth="1.2"
+          markerEnd="url(#arrow)"
+        />
+        <path
+          d={`M ${w.cx + boxW / 2} ${agentY} L ${p.cx - boxW / 2} ${agentY}`}
+          stroke="var(--color-pink)"
+          strokeWidth="1.2"
+          markerEnd="url(#arrow)"
+        />
+        <path
+          d={`M ${p.cx + boxW / 2} ${agentY} L ${r.cx - boxW / 2} ${agentY}`}
+          stroke="var(--color-pink)"
+          strokeWidth="1.2"
+          markerEnd="url(#arrow)"
+        />
+
+        {/* Animated request packet flowing CLI → Watcher → Planner → Risk */}
+        <g
+          style={{ offsetPath: `path("${flowPath.replace(/\s+/g, " ").trim()}")` }}
+          className="packet"
+        >
+          <circle r="9" fill="url(#packet-glow)" />
+          <circle r="3" fill="var(--color-pink)" />
         </g>
 
         {/* Agent boxes */}
@@ -166,118 +310,6 @@ function Diagram() {
             </text>
           </g>
         ))}
-
-        {/* Vertical hairlines from agent box down to its AXL node */}
-        {ax.map((a, i) => (
-          <line
-            key={`v${i}`}
-            x1={a.x}
-            y1={agentY + boxH / 2}
-            x2={a.x}
-            y2={a.y - 8}
-            stroke="var(--color-line)"
-            strokeWidth="1"
-            strokeDasharray="2 3"
-          />
-        ))}
-
-        {/* AXL nodes, small ringed dots */}
-        {ax.map((a, i) => (
-          <g key={`n${i}`}>
-            <circle
-              cx={a.x}
-              cy={a.y}
-              r="6.5"
-              fill="none"
-              stroke="var(--color-line)"
-              strokeWidth="1"
-            />
-            <circle cx={a.x} cy={a.y} r="3" fill="var(--color-pink)" className="axl-pulse" />
-            <text
-              x={a.x}
-              y={a.y + 24}
-              textAnchor="middle"
-              fontFamily="var(--font-jetbrains)"
-              fontSize="9"
-              fill="var(--color-muted)"
-            >
-              axl :{9002 + i * 10}
-            </text>
-            <text
-              x={a.x}
-              y={a.y + 38}
-              textAnchor="middle"
-              fontFamily="var(--font-jetbrains)"
-              fontSize="8"
-              fill="var(--color-faint)"
-            >
-              {peerId(i)}
-            </text>
-          </g>
-        ))}
-
-        {/* AXL mesh (peer-to-peer arc), full mesh between the four nodes */}
-        {(() => {
-          const lines: React.ReactNode[] = [];
-          for (let i = 0; i < ax.length; i++) {
-            for (let j = i + 1; j < ax.length; j++) {
-              const a = ax[i]!;
-              const b = ax[j]!;
-              const mx = (a.x + b.x) / 2;
-              const my = a.y + Math.min(40, Math.abs(b.x - a.x) * 0.18);
-              lines.push(
-                <path
-                  key={`m${i}${j}`}
-                  d={`M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}`}
-                  fill="none"
-                  stroke="var(--color-line)"
-                  strokeWidth="1"
-                />,
-              );
-            }
-          }
-          return lines;
-        })()}
-
-        {/* Sequential pink request flow on top of agent layer */}
-        <path
-          d={`M ${cli.cx + boxW / 2} ${agentY} L ${w.cx - boxW / 2} ${agentY}`}
-          stroke="var(--color-pink)"
-          strokeWidth="1.2"
-          markerEnd="url(#arrow)"
-        />
-        <path
-          d={`M ${w.cx + boxW / 2} ${agentY} L ${p.cx - boxW / 2} ${agentY}`}
-          stroke="var(--color-pink)"
-          strokeWidth="1.2"
-          markerEnd="url(#arrow)"
-        />
-        <path
-          d={`M ${p.cx + boxW / 2} ${agentY} L ${r.cx - boxW / 2} ${agentY}`}
-          stroke="var(--color-pink)"
-          strokeWidth="1.2"
-          markerEnd="url(#arrow)"
-        />
-
-        {/* Layer labels on the side */}
-        <text
-          x="14"
-          y={agentY + 4}
-          fontFamily="var(--font-jetbrains)"
-          fontSize="9"
-          fill="var(--color-muted)"
-        >
-          agents
-        </text>
-        <text
-          x="14"
-          y={axlY + 4}
-          fontFamily="var(--font-jetbrains)"
-          fontSize="9"
-          fill="var(--color-muted)"
-        >
-          axl mesh
-        </text>
 
         {/* Caption */}
         <text

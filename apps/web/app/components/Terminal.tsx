@@ -1,7 +1,7 @@
 export function Terminal() {
   return (
     <div className="font-jetbrains text-[12.5px] leading-[1.7]">
-      <div className="overflow-hidden rounded-md border border-line bg-[#08080a] shadow-[0_30px_80px_-30px_rgba(0,0,0,0.8)]">
+      <div className="sheen overflow-hidden rounded-md border border-line bg-[#08080a] shadow-[0_30px_80px_-30px_rgba(0,0,0,0.8)]">
         {/* title bar */}
         <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
           <div className="flex gap-1.5">
@@ -9,21 +9,21 @@ export function Terminal() {
             <span className="block h-[9px] w-[9px] rounded-full bg-[#1f1e22]" />
             <span className="block h-[9px] w-[9px] rounded-full bg-[#1f1e22]" />
           </div>
-          <span className="text-[10.5px] text-muted">~/positions · zuno</span>
+          <span className="text-[10.5px] text-muted">~/zuno-wallet · operator</span>
           <span className="w-12" />
         </div>
 
         {/* body */}
-        <div className="px-6 py-5 text-fg-2">
+        <div className="cascade px-6 py-5 text-fg-2">
           <div className="text-fg">
-            <span className="text-pink">$</span> recommend what I should do with{" "}
-            <span className="text-pink">this position</span>
+            <span className="text-pink">$</span> recommend rebalance{" "}
+            <span className="text-pink">pos_4f2a3b</span>
           </div>
 
           <div className="mt-4 space-y-1 text-muted">
             <Line label="watcher" value="reading position pos_4f2a3b" />
-            <Line label="planner" value="proposing rebalance candidates" />
-            <Line label="risk" value="critiquing 2 candidates" />
+            <Line label="planner" value="proposing 2 candidates" />
+            <Line label="risk" value="critiquing, vetoing tighten" />
           </div>
 
           <div className="my-5 h-px bg-line" />
@@ -32,7 +32,7 @@ export function Terminal() {
             <Row k="position" v="USDC / ETH 0.05%" />
             <Row
               k="range"
-              v="1,820.40 to 2,040.10"
+              v="1,820.40 → 2,040.10"
               suffix={<span className="text-pink-deep">out of range</span>}
             />
             <Row k="current" v="2,073.62" />
@@ -43,28 +43,29 @@ export function Terminal() {
           <div className="space-y-1.5">
             <Row
               k="recommended"
-              v="1,940.00 to 2,210.00"
+              v="1,940 → 2,210"
               suffix={<span className="text-pink">widen + shift</span>}
             />
             <Row
               k="rejected"
-              v="1,995.00 to 2,150.00"
+              v="1,995 → 2,150"
               suffix={<span className="text-muted">too tight</span>}
             />
-            <Row
-              k="reason"
-              v="< 36h of buffer at recent volatility"
-              valueClass="text-fg-2"
-            />
+            <Row k="reason" v="< 36h buffer at recent volatility" valueClass="text-fg-2" />
+            <Row k="signer" v="zuno wallet · turnkey" valueClass="text-fg-2" />
           </div>
 
           <div className="my-5 h-px bg-line" />
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="text-muted">verdict</span>
+            <span className="text-pink">approve_with_caution</span>
+            <span className="text-faint">·</span>
             <span className="text-muted">confidence</span>
             <span className="text-fg">0.82</span>
-            <span className="text-muted">·</span>
-            <span className="text-pink">approve_with_caution</span>
+            <span className="text-faint">·</span>
+            <span className="text-muted">approval</span>
+            <span className="text-fg">human</span>
           </div>
 
           <div className="mt-6 text-fg">

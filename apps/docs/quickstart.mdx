@@ -17,18 +17,28 @@ cd zuno
 pnpm install
 ```
 
-For live reads, configure a read-only watch address and chain:
+Configure the Turnkey-backed Zuno wallet and chain:
 
 ```bash
-export ZUNO_WATCH_ADDRESS=0x...
+export ZUNO_AGENT_WALLET_ADDRESS=0x...
 export ZUNO_CHAIN_ID=42161
 export ZUNO_ARBITRUM_RPC_URL=https://...
 export ZUNO_MONITOR_INTERVAL_MS=60000
+export TURNKEY_ORGANIZATION_ID=...
+export TURNKEY_API_PUBLIC_KEY=...
+export TURNKEY_API_PRIVATE_KEY=...
 export ZUNO_AXL_URL=http://localhost:9002
 export ZUNO_AXL_CLI_PEER_ID=...
 export ZUNO_AXL_WATCHER_PEER_ID=...
 export ZUNO_AXL_PLANNER_PEER_ID=...
 export ZUNO_AXL_RISK_PEER_ID=...
+```
+
+Optional Telegram notifications for the monitor:
+
+```bash
+export ZUNO_TELEGRAM_BOT_TOKEN=
+export ZUNO_TELEGRAM_CHAT_ID=
 ```
 
 Optional: enable model fallback for loose natural-language intent routing.
@@ -71,12 +81,15 @@ pnpm cli
 Inside the shell:
 
 ```
-analyze wallet 0x...
-show positions for 0x...
+create my zuno wallet
+show my zuno wallet
+fund my zuno wallet
+inspect my positions
 inspect position 42
 recommend what I should do with this position
 show me the diff
 simulate it
+approve it
 apply it
 ```
 
@@ -86,11 +99,13 @@ For live monitoring, run the worker in a separate terminal:
 pnpm monitor
 ```
 
-The worker writes local alerts to `~/.zuno/alerts.json`. In the shell, use:
+The worker writes local alerts to `~/.zuno/alerts.json`. If Telegram env vars
+are configured, it also sends each new alert to the configured chat. In the shell,
+use:
 
 ```
 show alerts
-watch my wallet
+show my zuno wallet
 ```
 
 ## AXL

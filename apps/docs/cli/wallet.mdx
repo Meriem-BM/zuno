@@ -1,19 +1,24 @@
 ---
-title: zuno wallet
-description: List positions held by a wallet.
+title: Zuno wallet
+description: Manage the Turnkey-backed agent wallet.
 ---
 
 ```
-zuno wallet positions [owner]
+create my zuno wallet
+show my zuno wallet
+fund my zuno wallet
+what's my zuno wallet balance
+inspect my positions
 ```
 
-Lists Uniswap v3 positions associated with a read-only watch address. Paste an
-address in the shell or set `ZUNO_WATCH_ADDRESS` and `ZUNO_CHAIN_ID`.
+Zuno works through an agent wallet backed by Turnkey. The user's main wallet
+stays separate; the Zuno wallet is the wallet that holds execution funds,
+interacts with Uniswap, and signs after explicit approval.
 
 ## Example
 
 ```
-$ show positions for 0xabc...
+$ inspect my positions
 
   42   WETH / USDC   0.05%   out of range
   77   WETH / USDC   0.05%   in range
@@ -23,4 +28,6 @@ $ show positions for 0xabc...
 
 - Output includes a quick range indicator. Use `inspect position <id>` for
   the full snapshot.
-- This command does not hit the AXL mesh; it is a direct read.
+- Position reads are direct viem reads. Recommendations use Watcher → Planner
+  → Risk over AXL when the mesh is online.
+- The terminal never receives or stores raw private keys.

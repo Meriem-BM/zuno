@@ -81,7 +81,7 @@ export default [
     };
   }),
   {
-    files: ["apps/cli/**/*.{ts,tsx}", "packages/ui-terminal/**/*.{ts,tsx}"],
+    files: ["apps/cli/**/*.{ts,tsx}", "packages/terminal/**/*.{ts,tsx}"],
     plugins: {
       "react-hooks": reactHooks,
     },

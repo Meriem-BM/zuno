@@ -7,23 +7,26 @@ export function Hero() {
 
       <div className="relative grid grid-cols-1 gap-x-16 gap-y-20 lg:grid-cols-12">
         <div className="lg:col-span-7">
-          <p className="rise rise-1 font-jetbrains text-[11px] uppercase text-muted">
-            <span className="text-pink">v0.1</span> · multi-agent over gensyn axl
+          <p className="rise rise-1 flex items-center gap-3 font-jetbrains text-[11px] uppercase tracking-[0.04em] text-muted">
+            <MiniMesh />
+            <span>
+              <span className="text-pink">v0.1</span> · turnkey wallet · gensyn axl
+            </span>
           </p>
 
-          <h1 className="rise rise-2 mt-7 font-fraunces text-[44px] leading-[1.05] text-fg sm:text-[58px] lg:text-[68px]">
-            A terminal-native
+          <h1 className="rise rise-2 mt-7 font-fraunces text-[44px] leading-[1.05] tracking-[-0.01em] text-fg sm:text-[58px] lg:text-[68px]">
+            Rebalance Uniswap LPs
             <br />
-            copilot for{" "}
+            with{" "}
             <em className="italic text-pink" style={{ fontStyle: "italic" }}>
-              Uniswap
+              three agents
             </em>{" "}
-            LPs.
+            you can read.
           </h1>
 
-          <p className="rise rise-3 mt-8 max-w-[520px] text-[16.5px] leading-[1.65] text-fg-2">
-            Zuno uses a small network of AXL-connected agents to inspect positions, debate
-            rebalances, and produce execution-ready liquidity plans.
+          <p className="rise rise-3 mt-8 max-w-[540px] text-[16.5px] leading-[1.65] text-fg-2">
+            Watcher, Planner, and Risk debate every move. You see the diff, the rejected option, and
+            the reason. The Zuno wallet only signs once you approve.
           </p>
 
           <div className="rise rise-4 mt-12 flex flex-wrap items-center gap-5">
@@ -31,18 +34,23 @@ export function Hero() {
               href="#workflow"
               className="group inline-flex items-center gap-2 rounded-sm bg-fg px-5 py-2.5 font-jetbrains text-[12.5px] text-bg transition hover:bg-pink"
             >
-              View workflow
+              See the workflow
               <span className="transition group-hover:translate-x-0.5">→</span>
             </a>
             <a
               href="#architecture"
-              className="font-jetbrains text-[12.5px] text-fg-2 underline decoration-faint decoration-[1px] underline-offset-[6px] transition hover:text-pink hover:decoration-pink"
+              className="link-sweep font-jetbrains text-[12.5px] text-fg-2 transition hover:text-fg"
             >
-              Read architecture
+              How it&apos;s wired
             </a>
           </div>
 
-          <div className="rise rise-5 mt-16 flex items-center gap-4 font-jetbrains text-[11px] text-muted">
+          <div className="rise rise-5 mt-16 flex flex-wrap items-center gap-x-4 gap-y-2 font-jetbrains text-[11px] text-muted">
+            <span className="inline-flex items-center gap-2">
+              <span className="block h-[5px] w-[5px] rounded-full bg-pink axl-pulse" />
+              <span>cli online</span>
+            </span>
+            <span className="text-faint">|</span>
             <span>$ npm i -g zuno</span>
             <span className="text-faint">|</span>
             <span>brew install zuno</span>
@@ -53,10 +61,29 @@ export function Hero() {
           <Terminal />
           <div className="mt-3 flex items-center gap-2 px-1 font-jetbrains text-[10.5px] text-muted">
             <span className="block h-[5px] w-[5px] rounded-full bg-pink axl-pulse" />
-            <span>fig 1, reviewed recommendation for an ETH/USDC v3 position</span>
+            <span>fig 1, reviewed plan, awaiting human approval</span>
           </div>
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * Tiny live-mesh badge — three orbiting peer dots, telegraphs the
+ * "multi-agent over a peer-to-peer mesh" story before the user even
+ * scrolls. CSS-only animation; respects prefers-reduced-motion.
+ */
+function MiniMesh() {
+  return (
+    <span className="relative inline-block h-[22px] w-[22px] shrink-0" aria-hidden="true">
+      <span className="absolute inset-0 rounded-full border border-faint" />
+      <span className="absolute inset-0 mini-orbit">
+        <span className="absolute left-1/2 top-0 block h-[3.5px] w-[3.5px] -translate-x-1/2 rounded-full bg-pink" />
+        <span className="absolute left-full top-1/2 block h-[3.5px] w-[3.5px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg-2" />
+        <span className="absolute left-0 top-1/2 block h-[3.5px] w-[3.5px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg-2" />
+      </span>
+      <span className="absolute left-1/2 top-1/2 block h-[3.5px] w-[3.5px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-pink axl-pulse" />
+    </span>
   );
 }

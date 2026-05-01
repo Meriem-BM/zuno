@@ -10,8 +10,9 @@ separate worker:
 pnpm monitor
 ```
 
-The worker reads the configured watch address, polls Uniswap v3 positions, detects
-out-of-range or near-boundary positions, and writes local alerts to:
+The worker reads the configured Zuno wallet, polls Uniswap v3 positions, detects
+out-of-range or near-boundary positions, writes local alerts, and can optionally
+send Telegram notifications.
 
 ```
 ~/.zuno/alerts.json
@@ -20,21 +21,34 @@ out-of-range or near-boundary positions, and writes local alerts to:
 Inside `zuno`, use:
 
 ```
-watch my wallet
 show alerts
+show my zuno wallet
 ```
 
-`watch my wallet` verifies monitor configuration and shows the command to run.
+`show my zuno wallet` verifies wallet configuration.
 `show alerts` renders recent alerts without dumping JSON.
 
 ## Environment
 
 ```bash
-ZUNO_WATCH_ADDRESS=0x...
+ZUNO_AGENT_WALLET_ADDRESS=0x...
 ZUNO_CHAIN_ID=42161
 ZUNO_ARBITRUM_RPC_URL=https://...
 ZUNO_MONITOR_INTERVAL_MS=60000
 ```
+
+## Telegram
+
+Telegram is optional. When these vars are unset, the monitor stays local-only.
+
+```bash
+ZUNO_TELEGRAM_BOT_TOKEN=...
+ZUNO_TELEGRAM_CHAT_ID=...
+```
+
+Create a bot with BotFather, send the bot one message from the target chat, then
+use that chat id. The monitor sends only newly-created alerts; repeated checks of
+the same unacknowledged condition are deduped.
 
 The monitor never signs transactions. It only reads positions and writes local
 advisory alerts.

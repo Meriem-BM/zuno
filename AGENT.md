@@ -10,13 +10,14 @@ A user runs:
 
 Then types plain English inside the shell, for example:
 
-- connect my wallet
-- show my positions
+- create my zuno wallet
+- inspect my positions
 - inspect position 42
 - recommend what I should do with this position
 - show me the diff
 - simulate it
-- apply it with my wallet
+- approve it
+- apply it
 
 Zuno is not a generic wallet chatbot.
 It is a focused LP workflow tool.
@@ -37,19 +38,20 @@ Zuno should help a liquidity provider answer:
 1. User launches `zuno`
 2. User types plain English
 3. Intent parser maps text to a structured intent
-4. Direct tools handle read-only or deterministic tasks
+4. Direct tools handle deterministic reads and plan review
 5. AXL agents handle recommendation tasks
 6. Zuno renders concise, structured output
-7. User explicitly signs any transaction through the wallet flow
+7. User explicitly approves before Turnkey signs from the Zuno wallet
 
 ## Intents to support
 
 ### Wallet
 
-- connect wallet
-- show wallet balance
-- show my positions
-- transfer token
+- create my zuno wallet
+- show my zuno wallet
+- fund my zuno wallet
+- show zuno wallet balance
+- inspect my positions
 
 ### Position reads
 
@@ -230,6 +232,19 @@ Do not store:
 - no stale package versions
 - no deprecated patterns if a stable modern replacement exists
 
+## File layout rules
+
+For any source file beyond a thin entry point, do not pile constants, types, helpers, and the main implementation into one file. Split them out as soon as the file has more than the main implementation:
+
+- **Constants** live in their own `constants.ts`. Always extract — even one shared constant goes here.
+- **Types** live in their own `types.ts` when there are two or more, or when a type is referenced from another file. A single type used only in its own file can stay inline.
+- **Helper / pure functions** live in their own `helpers.ts`. The main file should contain the public surface (the route handlers, the React component, the hook body, the executor) — not the small pure utilities they call.
+- **Main file** contains the public surface only. It imports from `constants.ts`, `types.ts`, `helpers.ts`.
+
+Group these next to the main file (`apps/<app>/src/`, `packages/<pkg>/src/`, or in a `lib/` folder when the constants/helpers are reused across siblings inside the same app/package). Do not invent prefix-style names like `useShell-helpers.ts` or `proxy-types.ts` — use plain `helpers.ts` / `types.ts` / `constants.ts` next to or in `lib/`.
+
+This rule applies to every new file in this repo. If you find yourself writing inline `const FOO = …`, `interface Bar {…}`, and `function helper() {}` blocks above the public surface in the same file, move them out before finishing the change.
+
 ## Design expectations
 
 CLI:
@@ -324,7 +339,7 @@ Every PR should:
 Any PR touching these areas requires extra review:
 
 - signer flows
-- wallet connection
+- agent wallet lifecycle
 - execution pipeline
 - policy logic
 - risk logic
@@ -420,7 +435,7 @@ A task is done only when:
 - Keep `zuno` startup fast.
 - Avoid blocking the interactive shell unnecessarily.
 - Minimize repeated network calls.
-- Cache only safe read-only data.
+- Cache only safe non-sensitive read data.
 - Keep agent payloads compact.
 - Stream or stage slower tasks when helpful.
 - Do not trade correctness for minor speed gains in financial logic.

@@ -4,7 +4,9 @@ description: A terminal-native copilot for Uniswap LPs.
 ---
 
 Zuno is a small, opinionated tool for people who run liquidity positions on
-Uniswap v3 and want help thinking, not a dashboard, not an autopilot.
+Uniswap v3 and want help thinking, not a dashboard, not an autopilot. It is
+built around a Turnkey-backed Zuno wallet: the user's main wallet stays
+separate, and the agent wallet is the execution wallet.
 
 It runs in your terminal. You point it at a position, and it returns a
 structured rebalance plan with a clear reason and a confidence score.
@@ -59,9 +61,9 @@ only routes, synthesises and explains. It never invents numbers.
 
 ## Status
 
-v0.1 supports read-only wallet sessions, Uniswap v3 NFT position reads through
-viem, deterministic recommendation, plan storage, diff, simulation preview,
-and guarded apply preparation. The full Watcher → Planner → Risk path runs
-over AXL when the local mesh is online; otherwise the same deterministic
-planner is used locally. `apply` requires explicit wallet-mode signing and
-does not store private keys or submit hidden transactions from the terminal.
+v0.1 supports a Turnkey-backed Zuno wallet, Uniswap v3 NFT position reads
+through viem, deterministic recommendation, plan storage, diff, simulation
+preview, approval state, and guarded apply preparation. The full Watcher →
+Planner → Risk path runs over AXL when the local mesh is online; otherwise the
+same deterministic planner is used locally. `apply` requires explicit approval
+and signs through the Turnkey boundary only after policy checks pass.
