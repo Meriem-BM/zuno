@@ -29,4 +29,26 @@ export const TOKEN_WHITELIST: Record<ChainId, Token[]> = {
     T("0xda10009cbd5d07dd0cecc66161fc93d7c9000da1", "DAI", 18),
     T("0x82af49447d8a07e3bd95bd0d56f35241523fbab1", "WETH", 18),
   ],
+  11155111: [
+    // Canonical Sepolia WETH9.
+    T("0xfff9976782d46cc05630d1f6ebab18b2324d6b14", "WETH", 18),
+    // Circle's testnet USDC for Sepolia. Used by Uniswap's v4 demo pools.
+    T("0x1c7d4b196cb0c7b01d743fbc6116a902379c7238", "USDC", 6),
+    // Aave-issued Sepolia USDT (testnet faucet token used by several DeFi demos).
+    T("0xaa8e23fb1079ea71e0a56f48a2aa51851d8433d0", "USDT", 6),
+  ],
+  84532: [
+    T("0x4200000000000000000000000000000000000006", "WETH", 18),
+    // Circle Base Sepolia USDC (testnet).
+    T("0x036cbd53842c5426634e7929541ec2318f3dcf7e", "USDC", 6),
+  ],
+  421614: [
+    T("0x980b62da83eff3d4576c647993b0c1d7faf17c73", "WETH", 18),
+    // Circle Arbitrum Sepolia USDC (testnet).
+    T("0x75faf114eafb1bdbe2f0316df893fd58ce46aa4d", "USDC", 6),
+  ],
+  1301: [
+    T("0x4200000000000000000000000000000000000006", "WETH", 18),
+    T("0x31d0220469e10c4e71834a79b1f276d740d3768f", "USDC", 6),
+  ],
 };

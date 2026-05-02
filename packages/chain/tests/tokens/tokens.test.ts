@@ -6,6 +6,7 @@ import {
   checkApprovalRequirement,
   fetchBalances,
   MAX_UINT256,
+  lookupToken,
   readAllowance,
   type TokenReadClient,
 } from "../../src/tokens/index.js";
@@ -48,7 +49,7 @@ const allowanceClient = (allowanceWei: bigint): TokenReadClient => ({
   },
 });
 
-describe("@zuno/chain/tokens — balances", () => {
+describe("@zuno/chain/tokens - balances", () => {
   it("returns native + dedup'd ERC20 list", async () => {
     const snap = await fetchBalances(owner, 42161, {
       client: balanceClient,
@@ -72,9 +73,20 @@ describe("@zuno/chain/tokens — balances", () => {
     ).length;
     assert.equal(count, 1);
   });
+
+  it("includes the testnet whitelist tokens", () => {
+    assert.equal(
+      lookupToken("WETH", 11155111)?.address.toLowerCase(),
+      "0xfff9976782d46cc05630d1f6ebab18b2324d6b14",
+    );
+    assert.equal(
+      lookupToken("USDC", 1301)?.address.toLowerCase(),
+      "0x31d0220469e10c4e71834a79b1f276d740d3768f",
+    );
+  });
 });
 
-describe("@zuno/chain/tokens — allowances + approve", () => {
+describe("@zuno/chain/tokens - allowances + approve", () => {
   it("reads and formats allowance", async () => {
     const reading = await readAllowance(
       { token: usdc, owner, spender, chainId: 42161 },

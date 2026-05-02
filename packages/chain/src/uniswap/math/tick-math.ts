@@ -5,7 +5,7 @@ export function tickToRawPrice(tick: number): number {
 }
 
 /**
- * Convert a raw v3 tick to a human-readable price token1/token0 (e.g. USDC per
+ * Convert a raw concentrated-liquidity tick to a human-readable price token1/token0 (e.g. USDC per
  * ETH, where token0 is WETH, token1 is USDC).
  */
 export function tickToPrice(tick: number, decimals0: number, decimals1: number): number {

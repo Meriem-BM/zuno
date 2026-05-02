@@ -67,19 +67,19 @@ importers:
         version: link:../../packages/terminal
       ink:
         specifier: ^6.3.0
-        version: 6.3.0(@types/react@19.2.14)(react@19.2.3)
+        version: 6.3.0(@types/react@19.2.14)(react@19.2.5)
       ink-text-input:
         specifier: ^6.0.0
-        version: 6.0.0(ink@6.3.0(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
+        version: 6.0.0(ink@6.3.0(@types/react@19.2.14)(react@19.2.5))(react@19.2.5)
       react:
-        specifier: ^19.2.0
-        version: 19.2.3
+        specifier: ^19.2.5
+        version: 19.2.5
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.17
       '@types/react':
-        specifier: ^19.0.0
+        specifier: ^19.2.14
         version: 19.2.14
       '@zuno/storage':
         specifier: workspace:*
@@ -284,11 +284,11 @@ importers:
         specifier: ^6.3.0
         version: 6.3.0(@types/react@19.2.14)(react@19.2.5)
       react:
-        specifier: ^19.2.0
+        specifier: ^19.2.5
         version: 19.2.5
     devDependencies:
       '@types/react':
-        specifier: ^19.0.0
+        specifier: ^19.2.14
         version: 19.2.14
       typescript:
         specifier: ^5.6.0
@@ -10394,11 +10394,11 @@ snapshots:
       ink: 6.3.0(@types/react@19.2.14)(react@19.2.3)
       react: 19.2.3
 
-  ink-text-input@6.0.0(ink@6.3.0(@types/react@19.2.14)(react@19.2.3))(react@19.2.3):
+  ink-text-input@6.0.0(ink@6.3.0(@types/react@19.2.14)(react@19.2.5))(react@19.2.5):
     dependencies:
       chalk: 5.6.2
-      ink: 6.3.0(@types/react@19.2.14)(react@19.2.3)
-      react: 19.2.3
+      ink: 6.3.0(@types/react@19.2.14)(react@19.2.5)
+      react: 19.2.5
       type-fest: 4.41.0
 
   ink@6.3.0(@types/react@19.2.14)(react@19.2.3):

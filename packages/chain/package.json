@@ -9,7 +9,8 @@
     "./config": "./src/config/index.ts",
     "./wallet": "./src/wallet/index.ts",
     "./tokens": "./src/tokens/index.ts",
-    "./uniswap": "./src/uniswap/index.ts"
+    "./uniswap": "./src/uniswap/index.ts",
+    "./uniswap/trading-api": "./src/uniswap/trading-api/index.ts"
   },
   "scripts": {
     "test": "tsx --test tests/**/*.test.ts",

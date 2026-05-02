@@ -1,7 +1,6 @@
-import { chainConfig } from "@zuno/chain/config";
+import { chainConfig, viemChainFor } from "@zuno/chain/config";
 import type { Address, ChainId, Token } from "@zuno/core";
 import { createPublicClient, erc20Abi, formatUnits, http } from "viem";
-import { arbitrum, base, mainnet, optimism } from "viem/chains";
 import { MAX_UINT256 } from "./constants.js";
 import type { TokenBalance, TokenReadClient } from "./types.js";
 
@@ -29,16 +28,9 @@ export function shortAddr(address: string): string {
 export function defaultClient(chainId: ChainId): TokenReadClient {
   const config = chainConfig(chainId);
   return createPublicClient({
-    chain: viemChain(chainId),
+    chain: viemChainFor(chainId),
     transport: http(config.rpcUrl),
   }) as unknown as TokenReadClient;
-}
-
-function viemChain(chainId: ChainId) {
-  if (chainId === 1) return mainnet;
-  if (chainId === 10) return optimism;
-  if (chainId === 8453) return base;
-  return arbitrum;
 }
 
 export async function readErc20Balances(
