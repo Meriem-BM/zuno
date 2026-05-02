@@ -1,0 +1,122 @@
+---
+title: zuno create
+description: Open a brand-new Uniswap v4 LP position with the four-agent debate.
+---
+
+```
+create a position with 0.05 ETH passively
+```
+
+Brand-new LP creation via the same four-agent debate that powers
+rebalance. Scout surveys live pools on the chain, Strategist proposes
+2-5 candidates across multiple pools, Critic stress-tests each against
+your goal, Arbiter resolves on deadlock.
+
+## What you can say
+
+The parser tolerates many phrasings. The load-bearing fields are
+**which token** and **how much**; everything else has a sensible default.
+
+| input | how it parses |
+|---|---|
+| `create a position with 0.05 ETH passively` | capital + risk profile, fully specified |
+| `LP some USDC` | token only - asks `how much USDC?` |
+| `provide liquidity 1000 USDC ETH/USDC 5bps` | pinned pair + fee tier |
+| `open ETH/USDC position with 1.5 ETH stay long ETH` | pinned pair + exposure preference |
+| `create a position` | both missing - asks `which token and how much?` |
+
+Risk-profile aliases:
+- `passive`, `safe`, `cautious`, `defensive` → conservative
+- `balanced`, `moderate` → balanced
+- `aggressive`, `active`, `yolo`, `degen`, `spicy` → aggressive
+
+Exposure preference:
+- `stay long ETH`, `keep my X`, `hold my X` → exposureBias=long-token (range
+  shifted so capital token sits more in the position)
+- default → neutral (centered on current price, ~50/50 deposit)
+
+## What happens
+
+1. Goal extraction: parser fills `createGoal`. Missing capital triggers
+   one clarification turn.
+2. CLI sends `flow_create_start` to **Scout** (or runs the in-process
+   orchestrator if AXL nodes aren't visible).
+3. **Scout** calls `discoverPools(chainId)` - real on-chain probe of
+   the v4 PoolManager via StateView. Returns initialized pools with
+   non-zero liquidity, ranked by liquidity descending. Per-pool: vol,
+   yield estimate, regime classification.
+4. **Strategist** proposes 2-5 `(poolIndex, widthMultiplier,
+   centerOffset, exposureBias)` candidates. The LLM picks proportions;
+   deterministic helpers snap to `tickSpacing` and compute deposit
+   amounts via `allocateForCreate`.
+5. **Critic** runs deterministic stress (1×, 2×, 3× vol) per candidate
+   and judges against the user's risk profile. Vetoes weak candidates,
+   asks for revisions, accepts winners.
+6. On accept: emits `plan_ready` with `kind: "create"`. CLI shows the
+   prepared mint action and waits for `approve it`.
+7. On deadlock after `ZUNO_MAX_DEBATE_ROUNDS`: **Arbiter** picks one
+   candidate from the latest proposal with explicit reasoning.
+8. `apply it` builds the v4 mint via `buildMint`, signs through Turnkey,
+   submits. The new tokenId becomes visible after one confirmation in
+   `inspect my positions`.
+
+## Example
+
+```
+> create a position with 0.05 ETH passively on sepolia
+
+  ◇ scout       2 live pools surveyed · gas 1.40gwei · regime ranging
+  ◇ scout       WETH/USDC 0.05%  vol 110bps  yield ~$0.42/d  ranging
+  ◇ scout       WETH/USDC 0.30%  vol 110bps  yield ~$0.28/d  ranging
+  ◇ strategist  3 candidates · passive lean wider · prefer 0.30% deeper liquidity
+  ◇ strategist  [0] WETH/USDC 0.30%  ±12%  buffer 60h  yield ~$0.28/d
+  ◇ strategist  [1] WETH/USDC 0.05%  ±8%   buffer 32h  yield ~$0.42/d
+  ◇ critic      reject [1]: 32h base buffer, OK; 2× buffer 16h < 18h passive floor
+  ◇ critic      accept [0]: 60h buffer, gas/yield 0.4x, survives 2× vol
+  ────────────────────────────────────────────────────────
+
+  pool        WETH/USDC  0.30%
+  range       1,840.00 → 2,340.00
+  deposit     0.05 WETH / 95 USDC
+  prep        swap ~0.025 WETH → USDC first to cover the range
+  goal        passive · neutral exposure · 0.05 ETH on sepolia
+  decided by  critic · debate converged
+  verdict     approve_with_caution  0.78
+```
+
+## Pool universe
+
+Pool discovery is **real and dynamic**. Zuno enumerates every
+`(token0, token1, feeTier)` combination from its token registry,
+computes the deterministic v4 pool id for each, and reads
+`StateView.getSlot0` + `getLiquidity` to confirm initialization.
+
+Unknown tokens (anything not in the registry) are excluded. To extend:
+add the token to `packages/chain/src/tokens/constants.ts`.
+
+To force a re-probe:
+
+```
+refresh pools
+```
+
+Caches at `~/.zuno/pools-{chainId}.json` with a 30-min TTL.
+
+## Risk-profile floors
+
+The Critic's veto thresholds are keyed to your risk profile:
+
+| profile | min base buffer | max gas/yield | tiebreak axis |
+|---|---|---|---|
+| conservative | 36h | 1.2× | largest 2× vol buffer |
+| balanced | 24h | 1.6× | best buffer × yield |
+| aggressive | 14h | 2.4× | highest yield non-vetoed |
+
+Override per session with `ZUNO_RISK_PROFILE=conservative|balanced|aggressive`.
+
+## Without the mesh
+
+If the four AXL agent peers aren't visible, the CLI runs the same four
+handlers in-process via `runDebateCreate`. If `OPENAI_API_KEY` is also
+unset, set `ZUNO_DETERMINISTIC=true` to use the deterministic fallback
+shapes. Pool discovery doesn't need an LLM.
