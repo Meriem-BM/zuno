@@ -46,7 +46,7 @@ const result = await esbuild.build({
   external: [
     "@turnkey/sdk-server",
     "@turnkey/crypto",
-    // ink's optional dev tools — only used when DEV=true at runtime;
+    // ink's optional dev tools - only used when DEV=true at runtime;
     // not needed for the published CLI.
     "react-devtools-core",
   ],

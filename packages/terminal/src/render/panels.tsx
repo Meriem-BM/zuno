@@ -59,7 +59,7 @@ export function IntentPanel({ intent }: IntentPanelProps): React.ReactElement {
 
 function sessionFields(state: SessionState): Field[] {
   const fmt = (value: string | number | null): string =>
-    value === null || value === undefined ? "—" : String(value);
+    value === null || value === undefined ? "-" : String(value);
   return [
     { key: "zuno", value: fmt(state.agentWalletAddress) },
     { key: "approval", value: fmt(state.approvalState) },

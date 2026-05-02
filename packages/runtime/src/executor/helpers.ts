@@ -30,8 +30,15 @@ export function applySessionUpdate(
 
   if (result.tool === "recommendRebalance" && isRecommendRebalanceData(result.data)) {
     patch.lastPlanId = result.data.planId;
+    patch.lastActionId = result.data.planId;
     patch.approvalState = "idle";
     patch.executionState = "drafted";
+  }
+
+  if (hasPreparedAction(result.data)) {
+    if (result.data.preparedAction.kind !== "approve") {
+      patch.lastActionId = result.data.preparedAction.id;
+    }
   }
 
   if (result.tool === "simulatePlan") {
@@ -90,5 +97,16 @@ function isApplyPlanData(data: unknown): data is ApplyPlanData {
 function isSwitchNetworkData(data: unknown): data is SwitchNetworkData {
   return (
     typeof data === "object" && data !== null && "chainId" in data && "previousChainId" in data
+  );
+}
+
+function hasPreparedAction(
+  data: unknown,
+): data is { preparedAction: { id: string; kind: string } } {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    "preparedAction" in data &&
+    typeof (data as { preparedAction?: { id?: unknown } }).preparedAction?.id === "string"
   );
 }

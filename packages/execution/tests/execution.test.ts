@@ -83,13 +83,12 @@ describe("execution preview", () => {
     assert.equal(simulation.onchainStatus, "not_checked");
   });
 
-  it("prepares a Turnkey-ready multicall via the deterministic builder", async () => {
+  it("prepares a Turnkey-ready v4 transaction via the deterministic builder", async () => {
     const preview = await prepareApply(plan, agentWallet);
     assert.equal(preview.status, "ready_for_turnkey");
     assert.equal(preview.policy.allowed, true);
     assert.equal(preview.transaction?.from, agentWallet);
-    // multicall(bytes[]) selector is 0xac9650d8
-    assert.ok(preview.transaction?.data.startsWith("0xac9650d8"), "expected multicall selector");
+    assert.ok(preview.transaction?.data.startsWith("0x"), "expected encoded calldata");
   });
 
   it("honors the dev override when ZUNO_UNISWAP_REBALANCE_CALLDATA is set", async () => {

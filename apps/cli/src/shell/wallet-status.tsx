@@ -13,7 +13,7 @@ export function WalletStatus({ state }: WalletStatusProps): React.ReactElement {
     return <StatusLine parts={["zuno wallet missing", "create my zuno wallet"]} />;
   }
 
-  const chain = state.chainId ? chainNameFor(state.chainId) : "—";
+  const chain = state.chainId ? chainNameFor(state.chainId) : "-";
   const parts = [`zuno ${shortAddr(state.agentWalletAddress)} on ${chain}`];
   if (state.approvalState) parts.push(`approval ${state.approvalState}`);
   if (state.executionState) parts.push(`execution ${state.executionState}`);

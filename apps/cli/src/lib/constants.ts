@@ -10,7 +10,7 @@ export const SHELL_LEVEL_INTENTS: ReadonlySet<IntentKind> = new Set<IntentKind>(
 export const HELP_LINES: ReadonlyArray<string> = [
   "create my zuno wallet",
   "show my balances",
-  "what network am I on   ·   switch to arbitrum",
+  "what network am I on   ·   switch to arbitrum or sepolia",
   "show my allowances",
   "inspect my positions",
   "inspect position 42",
@@ -18,6 +18,7 @@ export const HELP_LINES: ReadonlyArray<string> = [
   "recommend what I should do with this position",
   "show me the diff   ·   simulate it",
   "approve it   ·   apply it",
+  "swap 1 ETH to USDC   ·   approve it   ·   apply it",
   "show alerts",
   "agent status   ·   show peers   ·   show logs",
 ];

@@ -53,7 +53,7 @@ export async function executeIntent(
   }
 
   const session =
-    result.status === "success"
+    result.status === "success" || result.status === "needs_confirmation"
       ? applySessionUpdate(intent, result, context.session)
       : applyNonSuccessSessionUpdate(intent, ctx.session);
 

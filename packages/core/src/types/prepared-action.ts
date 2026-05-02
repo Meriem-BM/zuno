@@ -11,6 +11,7 @@ export type PreparedActionState =
 
 export interface PreparedActionTransaction {
   chainId: ChainId;
+  from?: Address;
   to: Address;
   data: Hex;
   value: string;

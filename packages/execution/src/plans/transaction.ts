@@ -1,9 +1,12 @@
-import { buildRebalanceCalldata, NFPM_BY_CHAIN as UNISWAP_NFPM } from "@zuno/chain/uniswap";
+import {
+  buildRebalanceCalldata,
+  POSITION_MANAGER_BY_CHAIN as UNISWAP_POSITION_MANAGER,
+} from "@zuno/chain/uniswap";
 import type { Address, ChainId, Hex, Plan } from "@zuno/core";
 import type { ExecutionTransaction } from "./types.js";
 import { applySlippage, parseLiquidity, slippageBps } from "./utils.js";
 
-export const NFPM_BY_CHAIN: Partial<Record<ChainId, Address>> = UNISWAP_NFPM as Partial<
+export const POSITION_MANAGER_BY_CHAIN: Partial<Record<ChainId, Address>> = UNISWAP_POSITION_MANAGER as Partial<
   Record<ChainId, Address>
 >;
 
@@ -12,7 +15,7 @@ export function buildExecutionTransaction(
   agentWalletAddress: Address,
 ): ExecutionTransaction | undefined {
   const chainId = plan.snapshot.position.pool.chainId;
-  const to = NFPM_BY_CHAIN[chainId];
+  const to = POSITION_MANAGER_BY_CHAIN[chainId];
   if (!to) return undefined;
 
   const override = process.env.ZUNO_UNISWAP_REBALANCE_CALLDATA as Hex | undefined;

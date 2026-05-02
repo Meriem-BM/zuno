@@ -1,6 +1,7 @@
+import { chainConfig } from "@zuno/chain/config";
 import { checkApprovalRequirement } from "@zuno/chain/tokens";
 import type { Address, Plan } from "@zuno/core";
-import { NFPM_BY_CHAIN } from "./transaction.js";
+import { POSITION_MANAGER_BY_CHAIN } from "./transaction.js";
 import type {
   ApprovalReadiness,
   ExecutionTransaction,
@@ -31,7 +32,7 @@ export function checkExecutionPolicy(
   if (!transaction) {
     reasons.push("Could not build deterministic rebalance calldata for this plan.");
   } else {
-    const allowedTo = NFPM_BY_CHAIN[transaction.chainId];
+    const allowedTo = POSITION_MANAGER_BY_CHAIN[transaction.chainId];
     if (transaction.to.toLowerCase() !== allowedTo?.toLowerCase()) {
       reasons.push("Transaction target is not the allowlisted Uniswap position manager.");
     }
@@ -44,17 +45,7 @@ export function checkExecutionPolicy(
 
 export async function checkApprovals(plan: Plan, owner: Address): Promise<ApprovalReadiness[]> {
   const chainId = plan.snapshot.position.pool.chainId;
-  const spender = NFPM_BY_CHAIN[chainId];
-  if (!spender) {
-    return [
-      {
-        tokenSymbol: "LP",
-        requiredWei: "0",
-        sufficient: false,
-        reason: "No Uniswap position manager is allowlisted for this chain.",
-      },
-    ];
-  }
+  const spender = chainConfig(chainId).permit2;
 
   const tokens = [
     {
@@ -80,7 +71,7 @@ export async function checkApprovals(plan: Plan, owner: Address): Promise<Approv
         currentAllowanceWei: reading.currentAllowanceWei,
         sufficient: !reading.needsApproval,
         reason: reading.needsApproval
-          ? `Approve ${item.token.symbol} for the Uniswap position manager before applying.`
+          ? `Approve ${item.token.symbol} for Permit2 before applying.`
           : undefined,
       });
     } catch (error) {

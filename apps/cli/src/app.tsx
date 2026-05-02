@@ -116,7 +116,7 @@ function pendingMessage(text: string): string {
   if (/\brecommend|rebalance|what should\b/iu.test(text))
     return "asking watcher, planner, and risk...";
   if (/\b(create|open|mint|provide)\b.*\b(position|liquidity|range)\b/iu.test(text))
-    return "checking product boundary...";
+    return "asking scout, strategist, critic, and arbiter...";
   if (/\b(swap|trade|exchange|convert)\b/iu.test(text)) return "checking product boundary...";
   if (/\bdiff|simulate|apply\b/iu.test(text)) return "preparing plan preview...";
   if (/\bagent|peer|alert|watch|monitor\b/iu.test(text)) return "checking local services...";

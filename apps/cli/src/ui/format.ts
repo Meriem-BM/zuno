@@ -3,6 +3,7 @@ import type {
   AgentWalletData,
   ApplyPlanData,
   ApprovePlanData,
+  CreatePositionPreparedActionSummary,
   FundAgentWalletData,
   InspectPositionData,
   MonitorWalletData,
@@ -13,6 +14,7 @@ import type {
   ShowAllowancesData,
   ShowBalancesData,
   ShowNetworkData,
+  SwapPreparedActionSummary,
   SwapQuoteData,
   SwitchNetworkData,
   ToolExecutionResult,
@@ -23,7 +25,7 @@ export function shortAddr(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
-export function shortHash(hash: string): string {
+function shortHash(hash: string): string {
   return `${hash.slice(0, 10)}…${hash.slice(-4)}`;
 }
 
@@ -142,6 +144,7 @@ export function formatResultData(result: ToolExecutionResult): Field[] {
       const fields: Field[] = [
         { key: "planId", value: d.planId },
         { key: "verdict", value: `${d.verdict}  ${d.confidence.toFixed(2)}` },
+        ...(d.decidedBy ? [{ key: "decided by", value: d.decidedBy }] : []),
         {
           key: "recommended",
           value: `${d.recommended.priceLower.toFixed(2)} → ${d.recommended.priceUpper.toFixed(2)}  (${d.recommended.kind})`,
@@ -157,6 +160,12 @@ export function formatResultData(result: ToolExecutionResult): Field[] {
       if (d.slippageBps)
         fields.push({ key: "slippage", value: `${(d.slippageBps / 100).toFixed(2)}%` });
       if (d.prepAction) fields.push({ key: "prep", value: d.prepAction });
+      if (d.transcript && d.transcript.length > 0) {
+        fields.push({ key: "debate", value: `${d.transcript.length} turns` });
+        for (const line of d.transcript) {
+          fields.push({ key: "·", value: line });
+        }
+      }
       return fields;
     }
 
@@ -263,6 +272,31 @@ export function formatResultData(result: ToolExecutionResult): Field[] {
 
     case "applyPlan": {
       const d = data as ApplyPlanData;
+      if (d.kind === "create_position") {
+        return [
+          { key: "action", value: d.planId },
+          { key: "minted", value: `${d.pair} ${(d.feeTier / 10_000).toFixed(2)}%  range ${d.newRange.priceLower.toFixed(4)}–${d.newRange.priceUpper.toFixed(4)}` },
+          { key: "approval", value: d.approvalState },
+          { key: "execution", value: d.executionState },
+          { key: "status", value: d.status },
+          ...(d.transactionHash ? [{ key: "tx", value: shortHash(d.transactionHash) }] : []),
+          ...(d.turnkeyActivityId ? [{ key: "turnkey", value: d.turnkeyActivityId }] : []),
+          { key: "·", value: "tokenId visible after `inspect my positions` (one block confirmation)" },
+        ];
+      }
+      if (d.kind === "swap") {
+        return [
+          { key: "action", value: d.planId },
+          { key: "swap", value: `${d.amountIn ?? "0"} ${d.tokenIn?.symbol ?? ""} → ${d.amountOut ?? "0"} ${d.tokenOut?.symbol ?? ""}`.trim() },
+          { key: "route", value: d.route ?? "trading api" },
+          { key: "approval", value: d.approvalState },
+          { key: "execution", value: d.executionState },
+          { key: "status", value: d.status },
+          ...(d.minimumOut ? [{ key: "min", value: d.minimumOut }] : []),
+          ...(d.transactionHash ? [{ key: "tx", value: shortHash(d.transactionHash) }] : []),
+          ...(d.turnkeyActivityId ? [{ key: "turnkey", value: d.turnkeyActivityId }] : []),
+        ];
+      }
       return [
         { key: "planId", value: d.planId },
         { key: "signer", value: `${d.signer} ${shortAddr(d.agentWalletAddress)}` },
@@ -281,6 +315,15 @@ export function formatResultData(result: ToolExecutionResult): Field[] {
 
     case "approvePlan": {
       const d = data as ApprovePlanData;
+      if (d.kind === "swap") {
+        return [
+          { key: "action", value: d.planId },
+          { key: "swap", value: `${d.amountIn ?? "0"} ${d.tokenIn?.symbol ?? ""} → ${d.amountOut ?? "0"} ${d.tokenOut?.symbol ?? ""}`.trim() },
+          { key: "route", value: d.route ?? "trading api" },
+          { key: "approval", value: d.approvalState },
+          { key: "execution", value: d.executionState },
+        ];
+      }
       return [
         { key: "planId", value: d.planId },
         { key: "zuno", value: shortAddr(d.agentWalletAddress) },
@@ -291,8 +334,8 @@ export function formatResultData(result: ToolExecutionResult): Field[] {
     }
 
     case "showAgentStatus": {
-      const d = data as Record<"watcher" | "planner" | "risk", { status: string }>;
-      return (["watcher", "planner", "risk"] as const).map((role) => ({
+      const d = data as Record<"scout" | "strategist" | "critic" | "arbiter", { status: string }>;
+      return (["scout", "strategist", "critic", "arbiter"] as const).map((role) => ({
         key: role,
         value: d[role].status,
       }));
@@ -309,6 +352,28 @@ export function formatResultData(result: ToolExecutionResult): Field[] {
     case "showLogs": {
       const d = data as { lines: string[] };
       return d.lines.map((line, i) => ({ key: `· ${i + 1}`, value: line }));
+    }
+
+    case "refreshPools": {
+      const d = data as {
+        chainId: number;
+        count: number;
+        pools: { pair: string; feeTier: number; currentTick: number; liquidity: string }[];
+      };
+      if (d.count === 0) {
+        return [
+          { key: "chain", value: String(d.chainId) },
+          { key: "pools", value: "none discovered (check token registry)" },
+        ];
+      }
+      return [
+        { key: "chain", value: String(d.chainId) },
+        { key: "count", value: String(d.count) },
+        ...d.pools.map((p) => ({
+          key: `· ${p.pair}`,
+          value: `${(p.feeTier / 10_000).toFixed(2)}%  tick ${p.currentTick}  L=${p.liquidity}`,
+        })),
+      ];
     }
 
     case "monitorWallet": {
@@ -383,8 +448,46 @@ export function formatResultData(result: ToolExecutionResult): Field[] {
         { key: "min", value: `${d.minimumOut} ${d.tokenOut.symbol}` },
         { key: "fee", value: `${(d.feeTier / 10_000).toFixed(2)}%` },
         { key: "route", value: d.route },
+        { key: "source", value: d.source === "uniswap_trading_api" ? "Trading API" : "Uniswap v4" },
         ...d.notes.map((note) => ({ key: "note", value: note })),
       ];
+    }
+
+    case "swapTokens": {
+      if (result.status !== "needs_confirmation") return [];
+      const d = data as NeedsConfirmationData<SwapPreparedActionSummary>;
+      const summary = d.preparedAction.summary;
+      return [
+        { key: "swap", value: `${summary.amountIn} ${summary.tokenIn.symbol} → ${summary.amountOut} ${summary.tokenOut.symbol}` },
+        { key: "route", value: summary.route },
+        { key: "min", value: summary.minimumOut },
+        { key: "chain", value: summary.chainName },
+        { key: "id", value: d.preparedAction.id },
+      ];
+    }
+
+    case "createPosition": {
+      if (result.status !== "needs_confirmation") return [];
+      const d = data as NeedsConfirmationData<CreatePositionPreparedActionSummary>;
+      const s = d.preparedAction.summary;
+      const fields: Field[] = [
+        { key: "actionId", value: d.preparedAction.id },
+        {
+          key: "pool",
+          value: `${s.pool.token0.symbol}/${s.pool.token1.symbol}  ${(s.pool.feeTier / 10_000).toFixed(2)}%`,
+        },
+        { key: "chain", value: s.chainName },
+        { key: "range", value: `${s.priceLower.toFixed(4)} → ${s.priceUpper.toFixed(4)}` },
+        {
+          key: "deposit",
+          value: `${formatAtomic(s.amount0, s.pool.token0.decimals, s.pool.token0.symbol)} / ${formatAtomic(s.amount1, s.pool.token1.decimals, s.pool.token1.symbol)}`,
+        },
+        { key: "max", value: `${formatAtomic(s.amount0Max, s.pool.token0.decimals, s.pool.token0.symbol)} / ${formatAtomic(s.amount1Max, s.pool.token1.decimals, s.pool.token1.symbol)}` },
+      ];
+      if (s.prepAction) fields.push({ key: "prep", value: s.prepAction });
+      fields.push({ key: "goal", value: s.goalSummary });
+      for (const note of s.notes) fields.push({ key: "·", value: note });
+      return fields;
     }
 
     case "showAllowances": {

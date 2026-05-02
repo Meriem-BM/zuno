@@ -43,6 +43,7 @@ export type ToolName =
   | "showAgentStatus"
   | "showPeers"
   | "showLogs"
+  | "refreshPools"
   | "monitorWallet"
   | "showAlerts";
 
@@ -68,7 +69,6 @@ export type ErrorCode =
   | "CHAIN_READ_FAILED"
   | "CHAIN_UNSUPPORTED"
   | "TOKEN_UNKNOWN"
-  | "PLAN_REJECTED"
   | "APPROVAL_REQUIRED"
   | "AGENT_WALLET_NOT_FOUND"
   | "POLICY_REJECTED"
@@ -166,9 +166,19 @@ export interface RecommendRebalanceData {
   reason: string;
   verdict: string;
   confidence: number;
+  /**
+   * Live debate transcript captured during the flow. Each line is
+   * prefixed with the agent role (e.g. `[scout]`, `[critic]`). The CLI
+   * renders these as bullet rows so the user sees the reasoning that
+   * produced the recommendation.
+   */
+  transcript?: string[];
+  // Which agent took the final call: "critic" on convergence, "arbiter" on deadlock.
+  decidedBy?: "critic" | "arbiter" | "deterministic";
 }
 
 export interface ApplyPlanData {
+  kind: "plan" | "swap" | "create_position";
   planId: string;
   positionId: string;
   agentWalletAddress: Address;
@@ -200,9 +210,16 @@ export interface ApplyPlanData {
   signer: "turnkey";
   transactionHash?: Hex;
   turnkeyActivityId?: string;
+  tokenIn?: { symbol: string; address: Address; decimals: number };
+  tokenOut?: { symbol: string; address: Address; decimals: number };
+  amountIn?: string;
+  amountOut?: string;
+  minimumOut?: string;
+  route?: string;
 }
 
 export interface ApprovePlanData {
+  kind: "plan" | "swap";
   planId: string;
   positionId: string;
   agentWalletAddress: Address;
@@ -210,6 +227,71 @@ export interface ApprovePlanData {
   executionState: ExecutionState;
   summary: string;
   warnings: string[];
+  actionId?: string;
+  tokenIn?: { symbol: string; address: Address; decimals: number };
+  tokenOut?: { symbol: string; address: Address; decimals: number };
+  amountIn?: string;
+  amountOut?: string;
+  minimumOut?: string;
+  route?: string;
+  estimatedGas?: string;
+  estimatedGasUsd?: number;
+  verdict?: "approve" | "reject" | "approve_with_caution";
+  confidence?: number;
+  reasons?: string[];
+  signer?: "turnkey";
+  transactionHash?: Hex;
+  turnkeyActivityId?: string;
+}
+
+export interface CreatePositionPreparedActionSummary {
+  kind: "create_position";
+  chainId: ChainId;
+  chainName: string;
+  pool: {
+    address: Address;
+    token0: { symbol: string; address: Address; decimals: number };
+    token1: { symbol: string; address: Address; decimals: number };
+    feeTier: number;
+    tickSpacing: number;
+  };
+  tickLower: number;
+  tickUpper: number;
+  priceLower: number;
+  priceUpper: number;
+  // Atomic units the user is depositing on each side.
+  amount0: string;
+  amount1: string;
+  expectedYield24hUsd: number;
+  prepAction?: string;
+  goalSummary: string;
+  /**
+   * Max amounts the user is willing to spend (capital + 1% slippage buffer).
+   * The mint will revert if the actual amounts required exceed these.
+   */
+  amount0Max: string;
+  amount1Max: string;
+  notes: string[];
+}
+
+export interface SwapPreparedActionSummary {
+  kind: "swap";
+  chainId: ChainId;
+  chainName: string;
+  tokenIn: { symbol: string; address: Address; decimals: number };
+  tokenOut: { symbol: string; address: Address; decimals: number };
+  amountIn: string;
+  amountOut: string;
+  minimumOut: string;
+  route: string;
+  feeTier?: number;
+  price?: number;
+  source: "uniswap_trading_api" | "uniswap_v4";
+  quoteId?: string;
+  requestId?: string;
+  estimatedGas?: string;
+  estimatedGasUsd?: number;
+  notes: string[];
 }
 
 export interface MonitorWalletData {
@@ -280,7 +362,8 @@ export interface SwapQuoteData {
   feeTier: number;
   price: number;
   route: string;
-  /** Minimum out at default 50bps slippage. */
+  // Minimum out at default 50bps slippage.
   minimumOut: string;
   notes: string[];
+  source: "uniswap_trading_api" | "uniswap_v4";
 }

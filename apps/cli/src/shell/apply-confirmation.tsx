@@ -16,6 +16,9 @@ export function ApplyConfirmation({ result }: ApplyConfirmationProps): React.Rea
   }
 
   const data = result.data as ApplyPlanData;
+  if (data.kind === "swap") {
+    return <SwapConfirmation data={data} />;
+  }
   const verdictColor =
     data.verdict === "approve"
       ? palette.ok
@@ -86,6 +89,70 @@ export function ApplyConfirmation({ result }: ApplyConfirmationProps): React.Rea
             ))}
           </Box>
         ) : null}
+      </Box>
+
+      <Box marginTop={1}>
+        <Text color={palette.accent} bold>{`  ${symbols.prompt} `}</Text>
+        <Text color={palette.fg} bold>
+          {data.summary}
+        </Text>
+      </Box>
+      <Box flexDirection="column">
+        <Row k="zuno wallet" v={data.agentWalletAddress} />
+        <Row k="approval" v={data.approvalState} accent />
+        <Row k="execution" v={data.executionState} accent={data.executionState === "submitted"} />
+        {data.transactionHash ? <Row k="tx" v={data.transactionHash} /> : null}
+        {data.turnkeyActivityId ? <Row k="turnkey" v={data.turnkeyActivityId} muted /> : null}
+      </Box>
+      <Text color={palette.muted}>{`  ${HR}`}</Text>
+    </Box>
+  );
+}
+
+function SwapConfirmation({ data }: { data: ApplyPlanData }): React.ReactElement {
+  const verdictColor =
+    data.verdict === "approve"
+      ? palette.ok
+      : data.verdict === "approve_with_caution"
+        ? palette.warn
+        : palette.bad;
+
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <Text color={palette.muted}>{`  ${HR}`}</Text>
+      <Box marginTop={1}>
+        <Text color={palette.accent} bold>{`  ${symbols.diamond} apply swap `}</Text>
+        <Text color={palette.fg} bold>
+          {data.planId}
+        </Text>
+      </Box>
+
+      <Box marginTop={1} flexDirection="column">
+        <Section title="swap" />
+        <Row
+          k="pair"
+          v={`${data.amountIn ?? "0"} ${data.tokenIn?.symbol ?? ""} → ${data.amountOut ?? "0"} ${data.tokenOut?.symbol ?? ""}`.trim()}
+        />
+        <Row k="route" v={data.route ?? "trading api"} />
+        {data.minimumOut ? <Row k="min" v={data.minimumOut} muted /> : null}
+      </Box>
+
+      <Box marginTop={1} flexDirection="column">
+        <Section title="risk review" />
+        <Box>
+          <Text color={palette.muted}>{`  ${"verdict".padEnd(KEY_WIDTH)}`}</Text>
+          <Text color={verdictColor} bold>
+            {data.verdict}
+          </Text>
+          <Text color={palette.muted}>{`   confidence `}</Text>
+          <Text color={palette.fg}>{data.confidence.toFixed(2)}</Text>
+        </Box>
+        {data.reasons.map((reason, i) => (
+          <Box key={`reason-${i}`}>
+            <Text color={palette.muted}>{`  ${(i === 0 ? "reason" : "·").padEnd(KEY_WIDTH)}`}</Text>
+            <Text color={palette.fgDim}>{reason}</Text>
+          </Box>
+        ))}
       </Box>
 
       <Box marginTop={1}>

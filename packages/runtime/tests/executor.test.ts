@@ -24,6 +24,7 @@ const emptySession: SessionState = {
   chainId: null,
   lastPositionId: null,
   lastPlanId: null,
+  lastActionId: null,
   lastIntent: null,
   approvalState: "idle",
   executionState: "idle",
@@ -142,7 +143,7 @@ describe("executor plan approval and execution", () => {
         }),
         planStore: createMemoryPlanStore([plan]),
         executionReadiness: { checkAllowances: false, checkChain: false },
-        // No walletService — Turnkey signing must fail closed.
+        // No walletService - Turnkey signing must fail closed.
       }),
     );
 
@@ -207,6 +208,9 @@ describe("executor mappings", () => {
       "show_agent_wallet",
       "show_agent_wallet_balance",
       "fund_agent_wallet",
+      "approve_token",
+      "prepare_swap",
+      "swap_tokens",
       "list_positions",
       "inspect_position",
       "recommend_rebalance",
@@ -214,6 +218,8 @@ describe("executor mappings", () => {
       "simulate_plan",
       "approve_plan",
       "apply_plan",
+      "create_position",
+      "refresh_pools",
     ]) {
       assert.ok(intents.includes(expected as never), `${expected} is mapped`);
     }

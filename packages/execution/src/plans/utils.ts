@@ -31,10 +31,19 @@ export function executionSteps(plan: Plan): SimulationStep[] {
 }
 
 export function estimateGas(chainId: ChainId): { label: string; usd: number; gwei: number } {
-  const v3MintBurnGas = 350_000;
+  const v4MintBurnGas = 420_000;
   const ethProxyUsd = 2000;
-  const gwei = chainId === 1 ? 30 : chainId === 8453 ? 0.04 : chainId === 10 ? 0.001 : 0.07;
-  const eth = (gwei * v3MintBurnGas) / 1e9;
+  const gwei =
+    chainId === 1
+      ? 30
+      : chainId === 8453
+        ? 0.04
+        : chainId === 10
+          ? 0.001
+          : chainId === 42161
+            ? 0.07
+            : 0.001;
+  const eth = (gwei * v4MintBurnGas) / 1e9;
   const usd = eth * ethProxyUsd;
   const label =
     chainId === 1

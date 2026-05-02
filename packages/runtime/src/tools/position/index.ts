@@ -39,7 +39,7 @@ const inspectPosition: ToolDefinition = {
 const inspectAllPositions: ToolDefinition = {
   name: "inspectAllPositions",
   intents: ["inspect_all_positions"],
-  execute: async (intent, ctx) => {
+  execute: async (_intent, ctx) => {
     const target = resolveAgentWallet(ctx);
     if (!target) return missingAgentWallet("inspectAllPositions");
     try {
@@ -83,7 +83,7 @@ const checkRangeStatus: ToolDefinition = {
 const listOutOfRangePositions: ToolDefinition = {
   name: "listOutOfRangePositions",
   intents: ["list_out_of_range_positions"],
-  execute: async (intent, ctx) => {
+  execute: async (_intent, ctx) => {
     const target = resolveAgentWallet(ctx);
     if (!target) return missingAgentWallet("listOutOfRangePositions");
     try {
@@ -107,7 +107,7 @@ const listOutOfRangePositions: ToolDefinition = {
 const listRiskyPositions: ToolDefinition = {
   name: "listRiskyPositions",
   intents: ["list_risky_positions"],
-  execute: async (intent, ctx) => {
+  execute: async (_intent, ctx) => {
     const target = resolveAgentWallet(ctx);
     if (!target) return missingAgentWallet("listRiskyPositions");
     try {

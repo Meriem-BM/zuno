@@ -34,6 +34,13 @@ export function resolvePlanId(
   return intent.planId ?? ctx.session.lastPlanId ?? undefined;
 }
 
+export function resolveActionId(
+  intent: { planId?: string },
+  ctx: ExecutionContext,
+): string | undefined {
+  return intent.planId ?? ctx.session.lastActionId ?? ctx.session.lastPlanId ?? undefined;
+}
+
 export interface ReadTarget {
   address: Address;
   chainId: ChainId;

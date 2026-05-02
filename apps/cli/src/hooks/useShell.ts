@@ -163,7 +163,7 @@ export function useShell(): Shell {
             if (held) await replayHeldIntent(service, held);
           } catch (e) {
             const message = errorMessage(e);
-            // OTP codes are single-use — once verify rejects, the same
+            // OTP codes are single-use - once verify rejects, the same
             // otpId is dead and must be re-issued.
             if (isOtpExpiredError(message)) {
               setOtpHandle(null);

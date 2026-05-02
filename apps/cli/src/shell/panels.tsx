@@ -5,7 +5,7 @@ import React from "react";
 import { HELP_LINES } from "../lib/constants.js";
 import { formatResultData } from "../ui/format.js";
 
-export interface ResultPanelProps {
+interface ResultPanelProps {
   result: ToolExecutionResult;
 }
 
