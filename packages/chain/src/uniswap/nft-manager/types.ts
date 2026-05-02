@@ -19,6 +19,7 @@ export interface MintParams {
   fee: number;
   tickLower: number;
   tickUpper: number;
+  currentTick: number;
   amount0Desired: string;
   amount1Desired: string;
   amount0Min: string;
@@ -30,11 +31,10 @@ export interface MintParams {
 
 export interface IncreaseLiquidityParams {
   tokenId: bigint;
-  amount0Desired: string;
-  amount1Desired: string;
-  amount0Min: string;
-  amount1Min: string;
-  deadline: number;
+  liquidity: bigint;
+  amount0Max: string;
+  amount1Max: string;
+  hookData?: Hex;
   chainId: ChainId;
 }
 
@@ -50,6 +50,8 @@ export interface DecreaseLiquidityParams {
 export interface CollectParams {
   tokenId: bigint;
   recipient: Address;
+  token0: Address;
+  token1: Address;
   amount0Max: string;
   amount1Max: string;
   chainId: ChainId;
@@ -57,6 +59,9 @@ export interface CollectParams {
 
 export interface BurnParams {
   tokenId: bigint;
+  amount0Min?: string;
+  amount1Min?: string;
+  hookData?: Hex;
   chainId: ChainId;
 }
 

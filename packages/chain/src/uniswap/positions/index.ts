@@ -1,18 +1,30 @@
 import { chainConfig } from "@zuno/chain/config";
 import type { Address, Position, PositionSnapshot, RangeReport } from "@zuno/core";
-import { isAddress } from "viem";
-import { distanceFromBoundary, inRange, tickToPrice, utilization } from "../math/tick-math.js";
-import { FACTORY_ABI, NFPM_ABI, POOL_ABI, ZERO_ADDRESS } from "./lib/constants.js";
+import { toHex } from "viem";
 import {
+  decodePositionInfo,
   estimateAmounts,
   parseTokenId,
+  poolIdFor,
   publicClient,
   readToken,
-  tickSpacingForFee,
 } from "./lib/helpers.js";
+import {
+  POSITION_MANAGER_ABI,
+  STATE_VIEW_ABI,
+  ZERO_ADDRESS,
+} from "./lib/constants.js";
 import type { PositionReadOptions } from "./types.js";
+import { distanceFromBoundary, inRange, tickToPrice, utilization } from "../math/tick-math.js";
 
 export * from "./types.js";
+export {
+  buildPoolKey,
+  poolIdFor,
+  publicClient,
+  type PoolKey,
+} from "./lib/helpers.js";
+export { STATE_VIEW_ABI, ZERO_ADDRESS } from "./lib/constants.js";
 
 export async function getPosition(
   id: string,
@@ -22,65 +34,92 @@ export async function getPosition(
   const chain = chainConfig(options.chainId);
   const client = options.client ?? publicClient(chain.id);
 
-  if (options.owner) {
-    const actualOwner = await client.readContract({
-      address: chain.nonfungiblePositionManager,
-      abi: NFPM_ABI,
-      functionName: "ownerOf",
-      args: [tokenId],
-    });
-    if (String(actualOwner).toLowerCase() !== options.owner.toLowerCase()) {
-      throw new Error(`position ${id} is not owned by the configured wallet`);
-    }
+  const actualOwner = (await client.readContract({
+    address: chain.positionManager,
+    abi: POSITION_MANAGER_ABI,
+    functionName: "ownerOf",
+    args: [tokenId],
+  })) as Address;
+  if (options.owner && actualOwner.toLowerCase() !== options.owner.toLowerCase()) {
+    throw new Error(`position ${id} is not owned by the configured wallet`);
   }
 
-  const raw = (await client.readContract({
-    address: chain.nonfungiblePositionManager,
-    abi: NFPM_ABI,
-    functionName: "positions",
-    args: [tokenId],
-  })) as readonly unknown[];
-
-  const token0Address = raw[2] as Address;
-  const token1Address = raw[3] as Address;
-  const feeTier = Number(raw[4]);
-  const tickLower = Number(raw[5]);
-  const tickUpper = Number(raw[6]);
-  const liquidity = raw[7] as bigint;
-
-  const [token0, token1] = await Promise.all([
-    readToken(client, token0Address),
-    readToken(client, token1Address),
+  const [poolResult, positionLiquidity] = await Promise.all([
+    client.readContract({
+      address: chain.positionManager,
+      abi: POSITION_MANAGER_ABI,
+      functionName: "getPoolAndPositionInfo",
+      args: [tokenId],
+    }),
+    client.readContract({
+      address: chain.positionManager,
+      abi: POSITION_MANAGER_ABI,
+      functionName: "getPositionLiquidity",
+      args: [tokenId],
+    }),
   ]);
 
-  const poolAddress = (await client.readContract({
-    address: chain.uniswapV3Factory,
-    abi: FACTORY_ABI,
-    functionName: "getPool",
-    args: [token0Address, token1Address, feeTier],
-  })) as Address;
-  if (!isAddress(poolAddress) || poolAddress === ZERO_ADDRESS) {
-    throw new Error(`pool not found for position ${id}`);
-  }
+  const [poolKeyRaw, positionInfoRaw] = poolResult as readonly [
+    readonly unknown[],
+    bigint,
+  ];
+  const poolKey = {
+    currency0: poolKeyRaw[0] as Address,
+    currency1: poolKeyRaw[1] as Address,
+    fee: Number(poolKeyRaw[2]),
+    tickSpacing: Number(poolKeyRaw[3]),
+    hooks: poolKeyRaw[4] as Address,
+  };
+  const { tickLower, tickUpper } = decodePositionInfo(positionInfoRaw);
+  const poolId = poolIdFor(poolKey);
 
-  const [slot0, poolLiquidity] = await Promise.all([
-    client.readContract({ address: poolAddress, abi: POOL_ABI, functionName: "slot0" }),
-    client.readContract({ address: poolAddress, abi: POOL_ABI, functionName: "liquidity" }),
+  const [slot0, poolLiquidity, positionState, feeGrowthInside] = await Promise.all([
+    client.readContract({
+      address: chain.stateView,
+      abi: STATE_VIEW_ABI,
+      functionName: "getSlot0",
+      args: [poolId],
+    }),
+    client.readContract({
+      address: chain.stateView,
+      abi: STATE_VIEW_ABI,
+      functionName: "getLiquidity",
+      args: [poolId],
+    }),
+    client.readContract({
+      address: chain.stateView,
+      abi: STATE_VIEW_ABI,
+      functionName: "getPositionInfo",
+      args: [poolId, toHex(tokenId, { size: 32 })],
+    }),
+    client.readContract({
+      address: chain.stateView,
+      abi: STATE_VIEW_ABI,
+      functionName: "getFeeGrowthInside",
+      args: [poolId, tickLower, tickUpper],
+    }),
   ]);
 
   const currentTick = Number((slot0 as readonly unknown[])[1]);
+  const liquidity = positionLiquidity as bigint;
   const amounts = estimateAmounts(liquidity, currentTick, tickLower, tickUpper);
+  const [token0, token1] = await Promise.all([
+    readToken(client, poolKey.currency0, chain.id),
+    readToken(client, poolKey.currency1, chain.id),
+  ]);
+  const [, last0, last1] = positionState as readonly [bigint, bigint, bigint];
+  const [current0, current1] = feeGrowthInside as readonly [bigint, bigint];
 
   return {
     id: tokenId.toString(),
-    owner: options.owner ?? ZERO_ADDRESS,
+    owner: actualOwner ?? ZERO_ADDRESS,
     pool: {
-      address: poolAddress,
+      address: chain.poolManager,
       chainId: chain.id,
       token0,
       token1,
-      feeTier,
-      tickSpacing: tickSpacingForFee(feeTier),
+      feeTier: poolKey.fee,
+      tickSpacing: poolKey.tickSpacing,
       currentTick,
       sqrtPriceX96: String((slot0 as readonly unknown[])[0]),
       liquidity: String(poolLiquidity),
@@ -91,8 +130,8 @@ export async function getPosition(
     liquidity: liquidity.toString(),
     amount0: amounts.amount0,
     amount1: amounts.amount1,
-    feesOwed0: (raw[10] as bigint).toString(),
-    feesOwed1: (raw[11] as bigint).toString(),
+    feesOwed0: feeGrowthToAmount(liquidity, current0, last0).toString(),
+    feesOwed1: feeGrowthToAmount(liquidity, current1, last1).toString(),
   };
 }
 
@@ -102,27 +141,32 @@ export async function listPositions(
 ): Promise<Position[]> {
   const chain = chainConfig(options.chainId);
   const client = options.client ?? publicClient(chain.id);
-  const balance = await client.readContract({
-    address: chain.nonfungiblePositionManager,
-    abi: NFPM_ABI,
-    functionName: "balanceOf",
-    args: [owner],
-  });
+  const nextTokenId = (await client.readContract({
+    address: chain.positionManager,
+    abi: POSITION_MANAGER_ABI,
+    functionName: "nextTokenId",
+    args: [],
+  })) as bigint;
 
-  const ids = await Promise.all(
-    Array.from({ length: Number(balance) }, (_, i) =>
-      client.readContract({
-        address: chain.nonfungiblePositionManager,
-        abi: NFPM_ABI,
-        functionName: "tokenOfOwnerByIndex",
-        args: [owner, BigInt(i)],
-      }),
-    ),
-  );
+  const positions: Position[] = [];
+  for (let tokenId = 1n; tokenId < nextTokenId; tokenId += 1n) {
+    try {
+      const actualOwner = (await client.readContract({
+        address: chain.positionManager,
+        abi: POSITION_MANAGER_ABI,
+        functionName: "ownerOf",
+        args: [tokenId],
+      })) as Address;
+      if (actualOwner.toLowerCase() !== owner.toLowerCase()) continue;
+      positions.push(
+        await getPosition(tokenId.toString(), { ...options, owner, client, chainId: chain.id }),
+      );
+    } catch {
+      continue;
+    }
+  }
 
-  return Promise.all(
-    ids.map((id) => getPosition(String(id), { ...options, owner, client, chainId: chain.id })),
-  );
+  return positions;
 }
 
 export function buildSnapshot(position: Position): PositionSnapshot {
@@ -156,4 +200,9 @@ export function riskReason(snapshot: PositionSnapshot): string {
   if (!snapshot.range.inRange) return "out of range";
   const pct = (snapshot.range.utilization * 100).toFixed(0);
   return `near range boundary (${pct}% through current band)`;
+}
+
+function feeGrowthToAmount(liquidity: bigint, current: bigint, last: bigint): bigint {
+  if (liquidity <= 0n || current <= last) return 0n;
+  return (liquidity * (current - last)) / (1n << 128n);
 }

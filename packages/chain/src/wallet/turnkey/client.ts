@@ -41,13 +41,10 @@ class SessionScopedTurnkeyService implements AgentWalletService {
   }
 
   async signAndSubmit(tx: TurnkeyTransactionRequest): Promise<TurnkeySignResult> {
-    const caip2 = caip2For(tx.chainId);
-    if (!caip2) {
-      throw new Error(`Turnkey transaction submission is not configured for chain ${tx.chainId}.`);
-    }
     const result = await userScopedClient(this.session).apiClient().ethSendTransaction({
       from: tx.from,
-      caip2,
+      // Turnkey's generated CAIP-2 typing is narrower than the set of EVM chains we support.
+      caip2: caip2For(tx.chainId) as never,
       to: tx.to,
       value: tx.value,
       data: tx.data,

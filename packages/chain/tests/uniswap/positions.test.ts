@@ -15,10 +15,9 @@ import {
 const owner = "0xabc1230000000000000000000000000000000def" as Address;
 const token0 = token("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2", "WETH", 18);
 const token1 = token("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", "USDC", 6);
-const poolAddress = "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640" as Address;
 
 describe("position reads", () => {
-  it("lists NFT positions for the owner", async () => {
+  it("lists v4 positions for the owner", async () => {
     const positions = await listPositions(owner, { chainId: 1, client: reader() });
     assert.equal(positions.length, 2);
     assert.deepEqual(
@@ -62,7 +61,7 @@ function position(id: string, tickLower: number, tickUpper: number, currentTick:
     id,
     owner,
     pool: {
-      address: poolAddress,
+      address: "0x000000000004444c5dc75cB358380D2e3dE08A90" as Address,
       chainId: 1,
       token0,
       token1,
@@ -78,47 +77,54 @@ function position(id: string, tickLower: number, tickUpper: number, currentTick:
     liquidity: "5840291203487120349",
     amount0: "418000000000000000",
     amount1: "0",
-    feesOwed0: "8200000000000000",
-    feesOwed1: "12400000",
+    feesOwed0: "0",
+    feesOwed1: "0",
   };
 }
 
 function reader(): ContractReader {
   return {
     async readContract(args) {
-      if (args.functionName === "balanceOf") return 2n;
-      if (args.functionName === "tokenOfOwnerByIndex") {
-        return (args.args?.[1] as bigint) === 0n ? 42n : 43n;
+      if (args.functionName === "nextTokenId") return 44n;
+      if (args.functionName === "ownerOf") {
+        const tokenId = args.args?.[0] as bigint;
+        return tokenId === 42n || tokenId === 43n ? owner : "0x0000000000000000000000000000000000000001";
       }
-      if (args.functionName === "ownerOf") return owner;
-      if (args.functionName === "positions") {
+      if (args.functionName === "getPoolAndPositionInfo") {
         const tokenId = args.args?.[0] as bigint;
         const isFirst = tokenId === 42n;
         return [
-          0n,
-          "0x0000000000000000000000000000000000000000",
-          token0.address,
-          token1.address,
-          500,
-          isFirst ? -199_400 : -198_900,
-          isFirst ? -198_400 : -197_700,
-          5_840_291_203_487_120_349n,
-          0n,
-          0n,
-          8_200_000_000_000_000n,
-          12_400_000n,
+          [token0.address, token1.address, 500, 10, "0x0000000000000000000000000000000000000000"],
+          packPositionInfo(isFirst ? -199_400 : -198_900, isFirst ? -198_400 : -197_700),
         ];
       }
+      if (args.functionName === "getPositionLiquidity") {
+        return 5_840_291_203_487_120_349n;
+      }
+      if (args.functionName === "getSlot0") return [0n, -198_330, 0, 0];
+      if (args.functionName === "getLiquidity") return 12_345_678_901_234_567_890n;
+      if (args.functionName === "getPositionInfo") {
+        return [5_840_291_203_487_120_349n, 9_999n, 9_999n];
+      }
+      if (args.functionName === "getFeeGrowthInside") return [9_999n, 9_999n];
       if (args.functionName === "symbol") {
         return args.address.toLowerCase() === token0.address ? "WETH" : "USDC";
       }
       if (args.functionName === "decimals") {
         return args.address.toLowerCase() === token0.address ? 18 : 6;
       }
-      if (args.functionName === "getPool") return poolAddress;
-      if (args.functionName === "slot0") return [0n, -198_330, 0, 0, 0, 0, true];
-      if (args.functionName === "liquidity") return 12_345_678_901_234_567_890n;
       throw new Error(`unexpected read ${args.functionName}`);
     },
   };
+}
+
+function packPositionInfo(tickLower: number, tickUpper: number): bigint {
+  const hasSubscriber = 0n;
+  const lower = packInt24(tickLower);
+  const upper = packInt24(tickUpper);
+  return hasSubscriber | (lower << 8n) | (upper << 32n) | (1n << 56n);
+}
+
+function packInt24(value: number): bigint {
+  return BigInt(value < 0 ? value + 0x1000000 : value);
 }

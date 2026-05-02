@@ -1,52 +1,5 @@
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
 
-export const NFPM_ABI = [
-  {
-    type: "function",
-    name: "balanceOf",
-    stateMutability: "view",
-    inputs: [{ name: "owner", type: "address" }],
-    outputs: [{ name: "", type: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "ownerOf",
-    stateMutability: "view",
-    inputs: [{ name: "tokenId", type: "uint256" }],
-    outputs: [{ name: "", type: "address" }],
-  },
-  {
-    type: "function",
-    name: "tokenOfOwnerByIndex",
-    stateMutability: "view",
-    inputs: [
-      { name: "owner", type: "address" },
-      { name: "index", type: "uint256" },
-    ],
-    outputs: [{ name: "", type: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "positions",
-    stateMutability: "view",
-    inputs: [{ name: "tokenId", type: "uint256" }],
-    outputs: [
-      { name: "nonce", type: "uint96" },
-      { name: "operator", type: "address" },
-      { name: "token0", type: "address" },
-      { name: "token1", type: "address" },
-      { name: "fee", type: "uint24" },
-      { name: "tickLower", type: "int24" },
-      { name: "tickUpper", type: "int24" },
-      { name: "liquidity", type: "uint128" },
-      { name: "feeGrowthInside0LastX128", type: "uint256" },
-      { name: "feeGrowthInside1LastX128", type: "uint256" },
-      { name: "tokensOwed0", type: "uint128" },
-      { name: "tokensOwed1", type: "uint128" },
-    ],
-  },
-] as const;
-
 export const ERC20_ABI = [
   {
     type: "function",
@@ -64,41 +17,108 @@ export const ERC20_ABI = [
   },
 ] as const;
 
-export const FACTORY_ABI = [
+export const POSITION_MANAGER_ABI = [
   {
     type: "function",
-    name: "getPool",
+    name: "balanceOf",
     stateMutability: "view",
-    inputs: [
-      { name: "tokenA", type: "address" },
-      { name: "tokenB", type: "address" },
-      { name: "fee", type: "uint24" },
+    inputs: [{ name: "owner", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "ownerOf",
+    stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "nextTokenId",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "getPositionLiquidity",
+    stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ name: "liquidity", type: "uint128" }],
+  },
+  {
+    type: "function",
+    name: "getPoolAndPositionInfo",
+    stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [
+      {
+        name: "poolKey",
+        type: "tuple",
+        components: [
+          { name: "currency0", type: "address" },
+          { name: "currency1", type: "address" },
+          { name: "fee", type: "uint24" },
+          { name: "tickSpacing", type: "int24" },
+          { name: "hooks", type: "address" },
+        ],
+      },
+      { name: "positionInfo", type: "uint256" },
     ],
-    outputs: [{ name: "pool", type: "address" }],
   },
 ] as const;
 
-export const POOL_ABI = [
+export const STATE_VIEW_ABI = [
   {
     type: "function",
-    name: "slot0",
+    name: "getSlot0",
     stateMutability: "view",
-    inputs: [],
+    inputs: [
+      {
+        name: "poolId",
+        type: "bytes32",
+      },
+    ],
     outputs: [
       { name: "sqrtPriceX96", type: "uint160" },
       { name: "tick", type: "int24" },
-      { name: "observationIndex", type: "uint16" },
-      { name: "observationCardinality", type: "uint16" },
-      { name: "observationCardinalityNext", type: "uint16" },
-      { name: "feeProtocol", type: "uint8" },
-      { name: "unlocked", type: "bool" },
+      { name: "protocolFee", type: "uint24" },
+      { name: "lpFee", type: "uint24" },
     ],
   },
   {
     type: "function",
-    name: "liquidity",
+    name: "getLiquidity",
     stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "", type: "uint128" }],
+    inputs: [{ name: "poolId", type: "bytes32" }],
+    outputs: [{ name: "liquidity", type: "uint128" }],
+  },
+  {
+    type: "function",
+    name: "getPositionInfo",
+    stateMutability: "view",
+    inputs: [
+      { name: "poolId", type: "bytes32" },
+      { name: "positionId", type: "bytes32" },
+    ],
+    outputs: [
+      { name: "liquidity", type: "uint128" },
+      { name: "feeGrowthInside0LastX128", type: "uint256" },
+      { name: "feeGrowthInside1LastX128", type: "uint256" },
+    ],
+  },
+  {
+    type: "function",
+    name: "getFeeGrowthInside",
+    stateMutability: "view",
+    inputs: [
+      { name: "poolId", type: "bytes32" },
+      { name: "tickLower", type: "int24" },
+      { name: "tickUpper", type: "int24" },
+    ],
+    outputs: [
+      { name: "feeGrowthInside0X128", type: "uint256" },
+      { name: "feeGrowthInside1X128", type: "uint256" },
+    ],
   },
 ] as const;

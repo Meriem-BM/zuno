@@ -15,14 +15,14 @@ const usdc: Token = {
 };
 
 interface Args {
-  args: readonly [{ fee: number }];
+  args: readonly [{ poolKey: { fee: number } }];
 }
 
 const fakeClient = (perFee: Record<number, bigint>): SwapReadClient => ({
   async readContract({ args }) {
     const [params] = args as Args["args"];
-    const out = perFee[params.fee] ?? 0n;
-    return [out, 0n, 0, 100_000n];
+    const out = perFee[params.poolKey.fee] ?? 0n;
+    return [out, 0n];
   },
 });
 
@@ -52,7 +52,7 @@ describe("swap quoting", () => {
     const client = fakeClient({ 500: 0n, 3000: 0n, 10_000: 0n });
     await assert.rejects(
       () => quoteSwap({ tokenIn: weth, tokenOut: usdc, amountIn: "1", chainId: 42161 }, { client }),
-      /No Uniswap V3 pool/u,
+      /No Uniswap v4 pool/u,
     );
   });
 
@@ -67,7 +67,7 @@ describe("swap quoting", () => {
       amountOutWei: "2100000000",
       feeTier: 3000,
       price: 2100,
-      source: "uniswap_v3",
+      source: "uniswap_v4",
     } as const;
     assert.equal(minOutputFor(quote, 0), 2_100_000_000n);
     assert.equal(minOutputFor(quote, 50), (2_100_000_000n * 9_950n) / 10_000n);

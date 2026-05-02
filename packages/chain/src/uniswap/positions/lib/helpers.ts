@@ -1,14 +1,29 @@
-import { chainConfig } from "@zuno/chain/config";
-import type { Address, ChainId, Token } from "@zuno/core";
-import { createPublicClient, http } from "viem";
-import { arbitrum, base, mainnet, optimism } from "viem/chains";
-import { ERC20_ABI } from "./constants.js";
+import { chainConfig, viemChainFor } from "@zuno/chain/config";
+import type { Address, ChainId, Hex, Token } from "@zuno/core";
+import {
+  createPublicClient,
+  encodeAbiParameters,
+  formatUnits,
+  http,
+  keccak256,
+} from "viem";
+import { ERC20_ABI, ZERO_ADDRESS } from "./constants.js";
 import type { ContractReader } from "../types.js";
+
+export interface PoolKey {
+  currency0: Address;
+  currency1: Address;
+  fee: number;
+  tickSpacing: number;
+  hooks: Address;
+}
 
 export function publicClient(chainId: ChainId): ContractReader {
   const cfg = chainConfig(chainId);
-  const chain = { 1: mainnet, 10: optimism, 8453: base, 42161: arbitrum }[chainId];
-  return createPublicClient({ chain, transport: http(cfg.rpcUrl) }) as unknown as ContractReader;
+  return createPublicClient({
+    chain: viemChainFor(chainId),
+    transport: http(cfg.rpcUrl),
+  }) as unknown as ContractReader;
 }
 
 export function parseTokenId(id: string): bigint {
@@ -17,7 +32,19 @@ export function parseTokenId(id: string): bigint {
   return BigInt(raw);
 }
 
-export async function readToken(client: ContractReader, address: Address): Promise<Token> {
+export async function readToken(
+  client: ContractReader,
+  address: Address,
+  chainId?: ChainId,
+): Promise<Token> {
+  if (address === ZERO_ADDRESS) {
+    return {
+      address,
+      symbol: chainId ? chainConfig(chainId).nativeSymbol : "ETH",
+      decimals: 18,
+    };
+  }
+
   const [symbol, decimals] = await Promise.all([
     client.readContract({ address, abi: ERC20_ABI, functionName: "symbol" }),
     client.readContract({ address, abi: ERC20_ABI, functionName: "decimals" }),
@@ -58,4 +85,106 @@ export function estimateAmounts(
     amount0: Math.max(0, Math.floor(amount0)).toString(),
     amount1: Math.max(0, Math.floor(amount1)).toString(),
   };
+}
+
+export function liquidityForAmounts(
+  amount0: string,
+  amount1: string,
+  currentTick: number,
+  tickLower: number,
+  tickUpper: number,
+  decimals0: number,
+  decimals1: number,
+): bigint {
+  const raw0 = safeBigInt(amount0);
+  const raw1 = safeBigInt(amount1);
+  if (raw0 <= 0n && raw1 <= 0n) return 0n;
+
+  const value0 = Number(formatUnits(raw0, decimals0));
+  const value1 = Number(formatUnits(raw1, decimals1));
+  if (!Number.isFinite(value0) || !Number.isFinite(value1)) return 0n;
+
+  const sqrtLower = Math.sqrt(Math.pow(1.0001, tickLower));
+  const sqrtUpper = Math.sqrt(Math.pow(1.0001, tickUpper));
+  const sqrtCurrent = Math.sqrt(Math.pow(1.0001, currentTick));
+
+  let liquidity = 0;
+  if (currentTick <= tickLower) {
+    liquidity = (value0 * sqrtLower * sqrtUpper) / (sqrtUpper - sqrtLower);
+  } else if (currentTick < tickUpper) {
+    const liquidity0 = (value0 * sqrtCurrent * sqrtUpper) / (sqrtUpper - sqrtCurrent);
+    const liquidity1 = value1 / (sqrtCurrent - sqrtLower);
+    liquidity = Math.min(liquidity0, liquidity1);
+  } else {
+    liquidity = value1 / (sqrtUpper - sqrtLower);
+  }
+
+  if (!Number.isFinite(liquidity) || liquidity <= 0) return 0n;
+  return BigInt(Math.floor(liquidity));
+}
+
+export function buildPoolKey(token0: Address, token1: Address, fee: number): {
+  poolKey: PoolKey;
+  zeroForOne: boolean;
+} {
+  const lower = token0.toLowerCase() < token1.toLowerCase() ? token0 : token1;
+  const upper = lower === token0 ? token1 : token0;
+  return {
+    poolKey: {
+      currency0: lower,
+      currency1: upper,
+      fee,
+      tickSpacing: tickSpacingForFee(fee),
+      hooks: ZERO_ADDRESS,
+    },
+    zeroForOne: lower === token0,
+  };
+}
+
+export function poolIdFor(poolKey: PoolKey): Hex {
+  return keccak256(
+    encodeAbiParameters(
+      [
+        { type: "address" },
+        { type: "address" },
+        { type: "uint24" },
+        { type: "int24" },
+        { type: "address" },
+      ],
+      [
+        poolKey.currency0,
+        poolKey.currency1,
+        poolKey.fee,
+        poolKey.tickSpacing,
+        poolKey.hooks,
+      ],
+    ),
+  );
+}
+
+export function decodePositionInfo(info: bigint): {
+  hasSubscriber: boolean;
+  tickLower: number;
+  tickUpper: number;
+} {
+  const hasSubscriber = (info & 0xffn) !== 0n;
+  const tickLowerRaw = Number((info >> 8n) & 0xffffffn);
+  const tickUpperRaw = Number((info >> 32n) & 0xffffffn);
+  return {
+    hasSubscriber,
+    tickLower: signExtend24(tickLowerRaw),
+    tickUpper: signExtend24(tickUpperRaw),
+  };
+}
+
+function signExtend24(value: number): number {
+  return value & 0x800000 ? value - 0x1000000 : value;
+}
+
+function safeBigInt(value: string): bigint {
+  try {
+    return BigInt(value || "0");
+  } catch {
+    return 0n;
+  }
 }

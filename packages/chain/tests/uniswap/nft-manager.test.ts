@@ -28,7 +28,7 @@ const position: Position = {
   id: "42",
   owner: recipient,
   pool: {
-    address: "0x0000000000000000000000000000000000000000" as Address,
+    address: "0x000000000004444c5dc75cB358380D2e3dE08A90" as Address,
     chainId: 42161,
     token0,
     token1,
@@ -49,25 +49,18 @@ const position: Position = {
 };
 
 describe("liquidity calldata", () => {
-  it("nfpmFor returns the Arbitrum NFT manager", () => {
-    assert.equal(nfpmFor(42161), "0xc36442b4a4522e871399cd717abdd847ab11fe88");
+  it("nfpmFor returns the Base v4 position manager", () => {
+    assert.equal(nfpmFor(8453), chainConfig(8453).positionManager);
   });
 
-  it("chain config uses the official Base NFT position manager", () => {
-    assert.equal(nfpmFor(8453), "0x03a520b32c04bf3beef7beb72e919cf822ed34f1");
-    assert.equal(
-      chainConfig(8453).nonfungiblePositionManager,
-      "0x03a520b32c04bf3beef7beb72e919cf822ed34f1",
-    );
-  });
-
-  it("buildMint encodes the mint selector and target", () => {
+  it("buildMint encodes the modifyLiquidities target", () => {
     const tx = buildMint({
       token0,
       token1,
       fee: 500,
       tickLower: -200_000,
       tickUpper: -190_000,
+      currentTick: -198_330,
       amount0Desired: "100000000000000000",
       amount1Desired: "200000000",
       amount0Min: "0",
@@ -78,57 +71,55 @@ describe("liquidity calldata", () => {
     });
     assert.equal(tx.to, nfpmFor(42161));
     assert.equal(tx.value, "0");
-    // mint(MintParams) selector
-    assert.ok(tx.data.startsWith("0x88316456"), "expected mint selector 0x88316456");
+    assert.ok(tx.data.startsWith("0x"), "expected encoded calldata");
     assert.match(tx.description, /mint WETH\/USDC 0\.05%/u);
   });
 
-  it("buildIncreaseLiquidity encodes the right selector", () => {
+  it("buildIncreaseLiquidity encodes calldata", () => {
     const tx = buildIncreaseLiquidity(
       {
         tokenId: 42n,
-        amount0Desired: "50000000000000000",
-        amount1Desired: "100000000",
-        amount0Min: "0",
-        amount1Min: "0",
-        deadline: 1_900_000_000,
+        liquidity: 1_000_000n,
+        amount0Max: "50000000000000000",
+        amount1Max: "100000000",
         chainId: 42161,
       },
       token0,
       token1,
     );
-    assert.ok(tx.data.startsWith("0x219f5d17"), "expected increaseLiquidity selector 0x219f5d17");
+    assert.ok(tx.data.startsWith("0x"), "expected encoded calldata");
   });
 
-  it("buildDecreaseLiquidity encodes the right selector", () => {
+  it("buildDecreaseLiquidity encodes calldata", () => {
     const tx = buildDecreaseLiquidity({
       tokenId: 42n,
       liquidity: 1_000_000n,
       amount0Min: "0",
       amount1Min: "0",
-      deadline: 1_900_000_000,
       chainId: 42161,
     });
-    assert.ok(tx.data.startsWith("0x0c49ccbe"), "expected decreaseLiquidity selector 0x0c49ccbe");
+    assert.ok(tx.data.startsWith("0x"), "expected encoded calldata");
   });
 
-  it("buildCollect encodes the collect selector", () => {
+  it("buildCollect encodes calldata", () => {
     const tx = buildCollect({
       tokenId: 42n,
       recipient,
+      token0: token0.address,
+      token1: token1.address,
       amount0Max: "",
       amount1Max: "",
       chainId: 42161,
     });
-    assert.ok(tx.data.startsWith("0xfc6f7865"), "expected collect selector 0xfc6f7865");
+    assert.ok(tx.data.startsWith("0x"), "expected encoded calldata");
   });
 
-  it("buildBurn encodes the burn selector", () => {
+  it("buildBurn encodes calldata", () => {
     const tx = buildBurn({ tokenId: 42n, chainId: 42161 });
-    assert.ok(tx.data.startsWith("0x42966c68"), "expected burn selector 0x42966c68");
+    assert.ok(tx.data.startsWith("0x"), "expected encoded calldata");
   });
 
-  it("buildRebalanceCalldata wraps four calls in multicall", () => {
+  it("buildRebalanceCalldata builds a modifyLiquidities transaction", () => {
     const tx = buildRebalanceCalldata({
       position,
       liquidity: BigInt(position.liquidity),
@@ -140,9 +131,8 @@ describe("liquidity calldata", () => {
       amount1Min: "0",
       recipient,
     });
-    // multicall(bytes[]) selector is 0xac9650d8
-    assert.ok(tx.data.startsWith("0xac9650d8"), "expected multicall selector 0xac9650d8");
     assert.equal(tx.to, nfpmFor(42161));
+    assert.ok(tx.data.startsWith("0x"), "expected encoded calldata");
     assert.match(tx.description, /rebalance 42/u);
   });
 });

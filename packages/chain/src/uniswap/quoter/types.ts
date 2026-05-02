@@ -11,7 +11,7 @@ export interface SwapQuote {
   feeTier: number;
   /** Effective price = amountOut / amountIn, expressed as tokenOut per tokenIn. */
   price: number;
-  source: "uniswap_v3";
+  source: "uniswap_v4";
 }
 
 export interface QuoteSwapInput {
@@ -28,7 +28,7 @@ export interface QuoteSwapOptions {
 }
 
 /**
- * Minimal subset of viem's PublicClient — same trick used in `@zuno/chain/tokens`.
+ * Minimal subset of viem's PublicClient - same trick used in `@zuno/chain/tokens`.
  */
 export interface SwapReadClient {
   readContract(args: {

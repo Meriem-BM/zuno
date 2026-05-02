@@ -1,8 +1,7 @@
-import { chainConfig } from "@zuno/chain/config";
+import { chainConfig, viemChainFor } from "@zuno/chain/config";
 import type { Address, ChainId } from "@zuno/core";
 import { Turnkey } from "@turnkey/sdk-server";
 import { createPublicClient, http } from "viem";
-import { arbitrum, base, mainnet, optimism } from "viem/chains";
 import { DEFAULT_SESSION_PATH } from "./constants.js";
 import type { Session, TurnkeyEnv } from "../types.js";
 
@@ -45,22 +44,16 @@ export function isAddressLike(value: unknown): value is Address {
   return typeof value === "string" && /^0x[a-fA-F0-9]{40}$/u.test(value);
 }
 
-export function publicClient(chainId: ChainId) {
+export function publicClient(chainId: ChainId): ReturnType<typeof createPublicClient> {
   const config = chainConfig(chainId);
-  return createPublicClient({ chain: viemChain(chainId), transport: http(config.rpcUrl) });
+  return createPublicClient({
+    chain: viemChainFor(chainId),
+    transport: http(config.rpcUrl),
+  }) as ReturnType<typeof createPublicClient>;
 }
 
-export function viemChain(chainId: ChainId) {
-  if (chainId === 1) return mainnet;
-  if (chainId === 10) return optimism;
-  if (chainId === 8453) return base;
-  return arbitrum;
-}
-
-export function caip2For(chainId: ChainId): "eip155:1" | "eip155:8453" | null {
-  if (chainId === 1) return "eip155:1";
-  if (chainId === 8453) return "eip155:8453";
-  return null;
+export function caip2For(chainId: ChainId): string {
+  return `eip155:${chainId}`;
 }
 
 export async function postProxy<T>(

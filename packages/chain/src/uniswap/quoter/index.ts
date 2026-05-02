@@ -1,6 +1,6 @@
 import { formatUnits, parseUnits } from "viem";
-import { FEE_TIER_CANDIDATES, QUOTER_V2_ABI, QUOTER_V2_BY_CHAIN } from "./lib/constants.js";
-import { defaultClient } from "./lib/helpers.js";
+import { buildPoolKey, publicClient } from "../positions/lib/helpers.js";
+import { FEE_TIER_CANDIDATES, QUOTER_ABI, QUOTER_BY_CHAIN } from "./lib/constants.js";
 import type { QuoteSwapInput, QuoteSwapOptions, SwapQuote } from "./types.js";
 
 export * from "./lib/constants.js";
@@ -10,9 +10,9 @@ export async function quoteSwap(
   input: QuoteSwapInput,
   options: QuoteSwapOptions = {},
 ): Promise<SwapQuote> {
-  const quoter = QUOTER_V2_BY_CHAIN[input.chainId];
+  const quoter = QUOTER_BY_CHAIN[input.chainId];
   if (!quoter) {
-    throw new Error(`Uniswap V3 QuoterV2 not configured for chain ${input.chainId}`);
+    throw new Error(`Uniswap v4 Quoter not configured for chain ${input.chainId}`);
   }
   const client = options.client ?? defaultClient(input.chainId);
   const tiers = input.feeTiers ?? FEE_TIER_CANDIDATES;
@@ -20,21 +20,21 @@ export async function quoteSwap(
 
   let best: { amountOut: bigint; fee: number } | null = null;
   for (const fee of tiers) {
+    const { poolKey, zeroForOne } = buildPoolKey(input.tokenIn.address, input.tokenOut.address, fee);
     try {
       const result = (await client.readContract({
         address: quoter,
-        abi: QUOTER_V2_ABI as unknown,
+        abi: QUOTER_ABI as readonly unknown[],
         functionName: "quoteExactInputSingle",
         args: [
           {
-            tokenIn: input.tokenIn.address,
-            tokenOut: input.tokenOut.address,
-            amountIn: amountInWei,
-            fee,
-            sqrtPriceLimitX96: 0n,
+            poolKey,
+            zeroForOne,
+            exactAmount: amountInWei,
+            hookData: "0x",
           },
         ],
-      })) as [bigint, bigint, number, bigint];
+      })) as [bigint, bigint];
       const amountOut = result[0];
       if (!best || amountOut > best.amountOut) best = { amountOut, fee };
     } catch {}
@@ -42,7 +42,7 @@ export async function quoteSwap(
 
   if (!best || best.amountOut === 0n) {
     throw new Error(
-      `No Uniswap V3 pool found for ${input.tokenIn.symbol}/${input.tokenOut.symbol} on chain ${input.chainId}`,
+      `No Uniswap v4 pool found for ${input.tokenIn.symbol}/${input.tokenOut.symbol} on chain ${input.chainId}`,
     );
   }
 
@@ -61,7 +61,7 @@ export async function quoteSwap(
     amountOutWei: best.amountOut.toString(),
     feeTier: best.fee,
     price,
-    source: "uniswap_v3",
+    source: "uniswap_v4",
   };
 }
 
@@ -69,4 +69,8 @@ export function minOutputFor(quote: SwapQuote, slippageBps: number): bigint {
   const amountOut = BigInt(quote.amountOutWei);
   if (slippageBps <= 0) return amountOut;
   return (amountOut * BigInt(10_000 - slippageBps)) / 10_000n;
+}
+
+function defaultClient(chainId: QuoteSwapInput["chainId"]) {
+  return publicClient(chainId);
 }
