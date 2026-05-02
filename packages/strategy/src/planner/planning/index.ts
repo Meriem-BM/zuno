@@ -5,9 +5,8 @@ import { proposeCandidates } from "./candidates.js";
 import { defaultRiskContext } from "./risk-context.js";
 import type { RiskContext } from "./risk-context.js";
 
-export { DEFAULT_SLIPPAGE_BPS, proposeCandidates } from "./candidates.js";
-export { critiqueCandidates, critiqueWithContext, MIN_BUFFER_HOURS } from "./critique.js";
-export type { CritiqueResult } from "./critique.js";
+export { proposeCandidates } from "./candidates.js";
+export { critiqueWithContext } from "./critique.js";
 export { buildPlanDiff } from "./diff.js";
 export { defaultRiskContext } from "./risk-context.js";
 export type { RiskContext } from "./risk-context.js";
@@ -21,6 +20,7 @@ export function recommendPlan(snapshot: PositionSnapshot, context?: RiskContext)
   );
   return {
     id: newPlanId(),
+    kind: "rebalance",
     positionId: snapshot.position.id,
     createdAt: Date.now(),
     snapshot,

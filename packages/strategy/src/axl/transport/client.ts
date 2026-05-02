@@ -9,19 +9,15 @@ export interface AxlClientOptions {
 
 export type AxlHandler = (env: AxlEnvelope) => Promise<unknown> | unknown;
 
-/**
- * Talks to the local Gensyn AXL node. Each peer (cli, watcher, planner,
- * risk) runs its own node — the apiUrl points at *this* role's local node,
- * not a shared relay. Routing happens by ed25519 public key in the
- * X-Destination-Peer-Id header; AXL has no concept of roles, so we look up
- * the destination peer id from env.
- */
+// Each peer runs its own local AXL node; apiUrl points at *this* role's
+// node, not a shared relay. Routing happens by ed25519 public key in the
+// X-Destination-Peer-Id header; AXL has no concept of roles, so the
+// destination peer id is resolved from env at send time.
 export class AxlClient {
   readonly peerId: string;
   readonly role: AxlRole;
   readonly apiUrl: string;
   private pollInterval: number;
-  private polling = false;
 
   constructor(opts: AxlClientOptions) {
     this.role = opts.role;
@@ -45,26 +41,9 @@ export class AxlClient {
     }
   }
 
-  async request<TReq, TRes>(
-    env: AxlEnvelope<TReq>,
-    timeoutMs = 30_000,
-  ): Promise<AxlEnvelope<TRes>> {
-    await this.send(env);
-    const start = Date.now();
-    while (Date.now() - start < timeoutMs) {
-      const inbox = await this.recv();
-      const match = inbox.find((e) => e.requestId === env.requestId && e.from === env.to);
-      if (match) return match as AxlEnvelope<TRes>;
-      await sleep(this.pollInterval);
-    }
-    throw new Error(`AXL request ${env.requestId} (${env.kind}) timed out`);
-  }
-
-  /**
-   * Real AXL /recv returns at most one queued message per call (body =
-   * the bytes, X-From-Peer-Id header = the sender). 204 means nothing
-   * queued. We wrap into an array for backwards-compatible handler code.
-   */
+  // Real AXL /recv returns at most one queued message per call (body =
+  // the bytes, X-From-Peer-Id header = the sender). 204 means nothing
+  // queued. Wrapped into an array so handler code can iterate uniformly.
   async recv(): Promise<AxlEnvelope[]> {
     const res = await fetch(`${this.apiUrl}/recv`);
     if (res.status === 204) return [];
@@ -78,11 +57,6 @@ export class AxlClient {
     }
   }
 
-  /**
-   * Real AXL /topology returns this node's view: its own public key plus
-   * the peers it currently knows about. There is no role information at
-   * this layer — callers reconcile peer ids against env-configured ones.
-   */
   async topology(): Promise<AxlTopology> {
     const res = await fetch(`${this.apiUrl}/topology`);
     if (!res.ok) throw new Error(`AXL topology failed: ${res.status}`);
@@ -94,9 +68,7 @@ export class AxlClient {
   }
 
   async listen(handler: AxlHandler): Promise<void> {
-    if (this.polling) return;
-    this.polling = true;
-    while (this.polling) {
+    while (true) {
       try {
         const inbox = await this.recv();
         for (const env of inbox) {
@@ -128,10 +100,6 @@ export class AxlClient {
       } catch {}
       await sleep(this.pollInterval);
     }
-  }
-
-  stop(): void {
-    this.polling = false;
   }
 }
 

@@ -10,7 +10,7 @@ export interface RiskContext {
 
 export function defaultRiskContext(snapshot: PositionSnapshot): RiskContext {
   const pool = snapshot.position.pool;
-  const seed = simpleHash(`${pool.address}:${pool.feeTier}`);
+  const seed = simpleHash(`${pool.token0.address}:${pool.token1.address}:${pool.feeTier}`);
   const realizedVolBps = 90 + (seed % 280); // 90..370 bps
   const tickTravel24h = Math.max(
     pool.tickSpacing * 4,

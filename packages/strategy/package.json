@@ -12,14 +12,17 @@
     "./agents": "./src/agents/index.ts"
   },
   "scripts": {
-    "start:watcher": "tsx src/agents/watcher/index.ts",
-    "start:planner": "tsx src/agents/planner/index.ts",
-    "start:risk": "tsx src/agents/risk/index.ts",
-    "start:monitor": "tsx src/agents/monitor/index.ts",
+    "start:scout": "tsx src/agents/scout/index.ts",
+    "start:strategist": "tsx src/agents/strategist/index.ts",
+    "start:critic": "tsx src/agents/critic/index.ts",
+    "start:arbiter": "tsx src/agents/arbiter/index.ts",
+    "start:agents": "tsx src/agents/start-all.ts",
+    "start:monitor": "tsx src/monitor/index.ts",
     "test": "tsx --test tests/**/*.test.ts",
     "test:intents": "tsx --test tests/intents/*.test.ts",
     "test:planner": "tsx --test tests/planner/*.test.ts",
     "test:axl": "tsx --test tests/axl/*.test.ts",
+    "test:agents": "tsx --test tests/agents/*.test.ts",
     "test:monitor": "tsx --test tests/monitor/*.test.ts",
     "typecheck": "tsc --noEmit"
   },

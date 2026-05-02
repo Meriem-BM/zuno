@@ -1,7 +1,11 @@
 import type { PlanCandidate, PositionSnapshot, RiskNote } from "@zuno/core";
-import { defaultRiskContext, type RiskContext } from "./risk-context.js";
+import {
+  ETH_PRICE_USD_FALLBACK,
+  REBALANCE_GAS_UNITS,
+} from "../../agents/shared/lib/constants.js";
+import type { RiskContext } from "./risk-context.js";
 
-export const MIN_BUFFER_HOURS = 36;
+const MIN_BUFFER_HOURS = 36;
 
 export interface CritiqueResult {
   recommended: PlanCandidate;
@@ -14,13 +18,6 @@ interface RankedCandidate {
   candidate: PlanCandidate;
   bufferHours: number;
   gasFeeRatio: number;
-}
-
-export function critiqueCandidates(
-  snapshot: PositionSnapshot,
-  candidates: readonly PlanCandidate[],
-): CritiqueResult {
-  return critiqueWithContext(snapshot, candidates, defaultRiskContext(snapshot));
 }
 
 export function critiqueWithContext(
@@ -90,7 +87,7 @@ function buildRiskNote(
 function assessCandidate(candidate: PlanCandidate, context: RiskContext): RankedCandidate {
   const width = candidate.tickUpper - candidate.tickLower;
   const bufferHours = (width / Math.max(context.tickTravel24h, 1)) * 24;
-  const gasCostUsd = ((350_000 * context.gasGwei) / 1e9) * 2000;
+  const gasCostUsd = ((REBALANCE_GAS_UNITS * context.gasGwei) / 1e9) * ETH_PRICE_USD_FALLBACK;
   const gasFeeRatio = gasCostUsd / Math.max(context.feeYield24hUsd, 0.01);
   return { candidate, bufferHours, gasFeeRatio };
 }

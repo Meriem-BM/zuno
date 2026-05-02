@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createSession, type Address, type Position, type SessionState } from "@zuno/core";
+import { createSession, type Address, type Hex, type Position, type SessionState } from "@zuno/core";
 import { buildPlanDiff, recommendPlan } from "@zuno/strategy/planner";
 import { createMemoryPlanStore } from "@zuno/storage";
 import { buildSnapshot, tickToPrice } from "@zuno/chain/uniswap";
@@ -9,9 +9,10 @@ import { runIntent } from "../src/shell/run-intent.js";
 
 process.env.ZUNO_AXL_CLI_API_URL = "http://127.0.0.1:1";
 process.env.ZUNO_AXL_CLI_PEER_ID ??= "0".repeat(64);
-process.env.ZUNO_AXL_WATCHER_PEER_ID ??= "1".repeat(64);
-process.env.ZUNO_AXL_PLANNER_PEER_ID ??= "2".repeat(64);
-process.env.ZUNO_AXL_RISK_PEER_ID ??= "3".repeat(64);
+process.env.ZUNO_AXL_SCOUT_PEER_ID ??= "1".repeat(64);
+process.env.ZUNO_AXL_STRATEGIST_PEER_ID ??= "2".repeat(64);
+process.env.ZUNO_AXL_CRITIC_PEER_ID ??= "3".repeat(64);
+process.env.ZUNO_AXL_ARBITER_PEER_ID ??= "4".repeat(64);
 
 const agentWallet = "0xabc1230000000000000000000000000000000def" as Address;
 const emptySession: SessionState = {
@@ -20,6 +21,7 @@ const emptySession: SessionState = {
   chainId: null,
   lastPositionId: null,
   lastPlanId: null,
+  lastActionId: null,
   lastIntent: null,
   approvalState: "idle",
   executionState: "idle",
@@ -137,14 +139,23 @@ describe("runIntent product boundaries", () => {
     const run = await runTurn("need t swap some eth to usdc", sessionWithWallet());
     assert.equal(run.intent.intent, "swap_tokens");
     assert.equal(run.result?.tool, "swapTokens");
-    assert.equal(run.result?.status, "error");
+    assert.equal(run.result?.status, "needs_confirmation");
+    assert.equal(run.session.lastActionId, "swap_42");
+
+    const approved = await runTurn("approve it", run.session);
+    assert.equal(approved.intent.intent, "approve_plan");
+    assert.equal(approved.intent.planId, "swap_42");
+    assert.equal(approved.result?.tool, "approvePlan");
   });
 
-  it("keeps brand-new LP creation out of current scope", async () => {
+  it("creating a brand-new position asks for capital before running", async () => {
+    // Bare "create position" leaves the load-bearing fields (token + amount)
+    // empty; the parser should ask once before the four-agent debate fires.
     const run = await runTurn("create position", sessionWithWallet());
-    assert.equal(run.intent.intent, "create_position");
-    assert.equal(run.result?.tool, "createPosition");
-    assert.equal(run.result?.status, "error");
+    assert.equal(run.intent.intent, "needs_clarification");
+    assert.equal(run.intent.pendingIntent, "create_position");
+    assert.equal(run.intent.pendingField, "createCapital");
+    assert.match(run.intent.clarification ?? "", /which token and how much/iu);
   });
 });
 
@@ -212,6 +223,37 @@ const TEST_TOOLS: ToolRegistry = [
         agentWalletAddress: agentWallet,
         chainId: 8453,
         positions: [{ positionId: "42", pair: "WETH/USDC", feeTier: 500 }],
+      },
+    }),
+  },
+  {
+    name: "swapTokens",
+    intents: ["swap_tokens"],
+    execute: () => ({
+      tool: "swapTokens",
+      status: "needs_confirmation",
+      message: "Prepared swap.",
+      data: {
+        preparedAction: {
+          id: "swap_42",
+          kind: "swap",
+          summary: {
+            kind: "swap",
+            chainId: 8453,
+            chainName: "Base",
+            tokenIn: { symbol: "WETH", address: agentWallet, decimals: 18 },
+            tokenOut: { symbol: "USDC", address: agentWallet, decimals: 6 },
+            amountIn: "1",
+            amountOut: "2500",
+            minimumOut: "2487.5",
+            route: "Trading API",
+            source: "uniswap_trading_api",
+            notes: [],
+          },
+          transactions: [],
+          expiresAt: Date.now() + 60_000,
+        },
+        prompt: 'Type "approve it" to confirm.',
       },
     }),
   },
@@ -297,6 +339,36 @@ const TEST_TOOLS: ToolRegistry = [
     execute: async (intent, context) => {
       const planId = intent.planId ?? context.session.lastPlanId;
       const plan = planId ? await context.planStore?.get(planId) : null;
+      if (!plan && planId?.startsWith("swap_")) {
+        return {
+          tool: "approvePlan",
+          status: "success",
+          message: "Approved swap.",
+          data: {
+            kind: "swap",
+            planId,
+            actionId: planId,
+            positionId: planId,
+            agentWalletAddress: agentWallet,
+            approvalState: "approved",
+            executionState: "approved",
+            summary: "approved test swap",
+            warnings: [],
+            tokenIn: { symbol: "WETH", address: agentWallet, decimals: 18 },
+            tokenOut: { symbol: "USDC", address: agentWallet, decimals: 6 },
+            amountIn: "1",
+            amountOut: "2500",
+            minimumOut: "2487.5",
+            route: "Trading API",
+            estimatedGas: "150000",
+            estimatedGasUsd: 0.01,
+            verdict: "approve",
+            confidence: 0.9,
+            reasons: ["approved by risk"],
+            signer: "turnkey",
+          },
+        };
+      }
       return plan
         ? {
             tool: "approvePlan",
@@ -326,6 +398,45 @@ const TEST_TOOLS: ToolRegistry = [
     execute: async (intent, context) => {
       const planId = intent.planId ?? context.session.lastPlanId;
       const plan = planId ? await context.planStore?.get(planId) : null;
+      if (!plan && planId?.startsWith("swap_")) {
+        return {
+          tool: "applyPlan",
+          status: "success",
+          message: "Swap applied.",
+          data: {
+            kind: "swap",
+            planId,
+            actionId: planId,
+            positionId: planId,
+            agentWalletAddress: agentWallet,
+            approvalState: "approved",
+            executionState: "submitted",
+            status: "submitted",
+            summary: "submitted test swap",
+            pair: "WETH/USDC",
+            feeTier: 0,
+            oldRange: { priceLower: 0, priceUpper: 0 },
+            newRange: { priceLower: 0, priceUpper: 0 },
+            residual: { token0: "0", token1: "0" },
+            estimatedGas: "150000",
+            estimatedGasUsd: 0.01,
+            estimatedSlippage: 0.001,
+            verdict: "approve",
+            confidence: 0.9,
+            reasons: ["approved by risk"],
+            warnings: [],
+            signer: "turnkey",
+            tokenIn: { symbol: "WETH", address: agentWallet, decimals: 18 },
+            tokenOut: { symbol: "USDC", address: agentWallet, decimals: 6 },
+            amountIn: "1",
+            amountOut: "2500",
+            minimumOut: "2487.5",
+            route: "Trading API",
+            transactionHash: `0x${"12".repeat(32)}` as Hex,
+            turnkeyActivityId: "act_test",
+          },
+        };
+      }
       if (!plan) {
         return {
           tool: "applyPlan",
@@ -379,16 +490,6 @@ const TEST_TOOLS: ToolRegistry = [
       tool: "createPosition",
       status: "error",
       message: "Zuno does not create brand-new LP positions yet.",
-      errorCode: "EXECUTION_NOT_AVAILABLE",
-    }),
-  },
-  {
-    name: "swapTokens",
-    intents: ["swap_tokens"],
-    execute: () => ({
-      tool: "swapTokens",
-      status: "error",
-      message: "Zuno does not run standalone swaps.",
       errorCode: "EXECUTION_NOT_AVAILABLE",
     }),
   },

@@ -1,9 +1,11 @@
-type Color = "watcher" | "planner" | "risk" | "axl" | "muted";
+type Color = "scout" | "strategist" | "critic" | "arbiter" | "monitor" | "axl" | "muted";
 
 const PALETTE: Record<Color, string> = {
-  watcher: "\x1b[36m",
-  planner: "\x1b[33m",
-  risk: "\x1b[35m",
+  scout: "\x1b[36m",      // cyan
+  strategist: "\x1b[33m", // yellow
+  critic: "\x1b[31m",     // red
+  arbiter: "\x1b[35m",    // magenta
+  monitor: "\x1b[32m",    // green
   axl: "\x1b[35m",
   muted: "\x1b[90m",
 };
@@ -16,7 +18,7 @@ export function makeLogger(role: Color): Logger {
   return (msg) => {
     const ts = new Date().toISOString().slice(11, 19);
     process.stdout.write(
-      `${PALETTE.muted}${ts}${RESET}  ${PALETTE[role]}${role.padEnd(7)}${RESET}  ${msg}\n`,
+      `${PALETTE.muted}${ts}${RESET}  ${PALETTE[role]}${role.padEnd(10)}${RESET}  ${msg}\n`,
     );
   };
 }

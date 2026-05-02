@@ -15,7 +15,7 @@ function priceSeries(start: number, points: number, jitterPct: number): [number,
   return out;
 }
 
-describe("loadRiskContext — live oracle path", () => {
+describe("loadRiskContext - live oracle path", () => {
   beforeEach(() => {
     _clearOracleCache();
   });

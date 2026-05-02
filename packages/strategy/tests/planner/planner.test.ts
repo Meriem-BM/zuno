@@ -34,7 +34,7 @@ describe("planner", () => {
   });
 });
 
-describe("planner — risk context drives the veto", () => {
+describe("planner - risk context drives the veto", () => {
   it("vetoes a tighter candidate when its buffer is below the floor", async () => {
     const snapshot = buildSnapshot(position("43", -198_900, -197_700, -198_330));
     const candidates = proposeCandidates(snapshot);

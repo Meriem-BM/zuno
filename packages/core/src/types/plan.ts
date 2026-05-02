@@ -38,6 +38,8 @@ export interface Plan {
   rejected?: PlanCandidate;
   rejectReason?: string;
   risk: RiskNote;
+  // Discriminator. Defaults to "rebalance" for stored plans without it.
+  kind?: "rebalance" | "create";
 }
 
 export interface PlanDiff {

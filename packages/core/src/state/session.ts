@@ -6,6 +6,7 @@ export interface SessionState {
   chainId: ChainId | null;
   lastPositionId: string | null;
   lastPlanId: string | null;
+  lastActionId: string | null;
   lastIntent: string | null;
   approvalState: ApprovalState | null;
   executionState: ExecutionState | null;
@@ -23,6 +24,7 @@ const empty = (): SessionState => ({
   chainId: null,
   lastPositionId: null,
   lastPlanId: null,
+  lastActionId: null,
   lastIntent: null,
   approvalState: "idle",
   executionState: "idle",
