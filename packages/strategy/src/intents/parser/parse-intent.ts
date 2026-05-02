@@ -1,8 +1,15 @@
 import type { SessionState } from "@zuno/core";
 import { tryResumePending } from "./clarification.js";
 import { FALLBACK_CONFIDENCE_THRESHOLD, UNKNOWN_HINT } from "./constants.js";
+import { extractCreateGoal } from "./create-goal.js";
 import { extractEntities, normalize } from "./entities.js";
-import { PLAN_INTENTS, PLAN_REFS, POSITION_INTENTS, POSITION_REFS } from "./rules.js";
+import {
+  ACTION_INTENTS,
+  PLAN_INTENTS,
+  PLAN_REFS,
+  POSITION_INTENTS,
+  POSITION_REFS,
+} from "./rules.js";
 import { computeConfidence, correctTypos, scoreIntents } from "./scoring.js";
 import type {
   Entities,
@@ -66,12 +73,16 @@ export function parseIntentDeterministic(rawInput: string, session?: SessionStat
 
   const resolved = resolveReferences(scored.intent, scored.text, scored.entities, session);
 
+  const createGoal =
+    scored.intent === "create_position" ? extractCreateGoal(trimmed) : undefined;
+
   return validateIntent({
     intent: scored.intent,
     rawInput: trimmed,
     confidence: scored.confidence,
     ...(scored.corrections.length ? { corrections: scored.corrections } : null),
     ...resolved,
+    ...(createGoal && Object.keys(createGoal).length > 0 ? { createGoal } : null),
   });
 }
 
@@ -134,6 +145,16 @@ function resolveReferences(
   if (!out.positionId && POSITION_INTENTS.has(intent)) {
     if ((POSITION_REFS.test(text) || isShortCommandLikeInput(text)) && session.lastPositionId) {
       out.positionId = session.lastPositionId;
+    }
+  }
+  if (!out.planId && ACTION_INTENTS.has(intent)) {
+    if ((PLAN_REFS.test(text) || /\bit\b/u.test(text) || isShortCommandLikeInput(text)) && session.lastActionId) {
+      out.planId = session.lastActionId;
+    } else if (
+      (PLAN_REFS.test(text) || /\bit\b/u.test(text) || isShortCommandLikeInput(text)) &&
+      session.lastPlanId
+    ) {
+      out.planId = session.lastPlanId;
     }
   }
   if (!out.planId && PLAN_INTENTS.has(intent)) {

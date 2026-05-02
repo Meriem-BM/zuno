@@ -1,4 +1,9 @@
 import type { SessionState } from "@zuno/core";
+import { SUPPORTED_NETWORKS } from "@zuno/chain/config";
+
+const SUPPORTED_CHAIN_NAMES = SUPPORTED_NETWORKS.map((network) => network.name.toLowerCase()).join(
+  ", ",
+);
 
 export const SYSTEM_PROMPT = `You are Zuno's intent classifier.
 
@@ -16,7 +21,7 @@ Zuno is a terminal-native copilot for Uniswap liquidity providers. Users type pl
 - switch_network: switch the session chain/network
 - show_allowances: show ERC20 allowances granted by the Zuno wallet
 - fund_agent_wallet: user wants instructions to fund the Zuno agent wallet
-- create_position: user asks to create/open/mint a new LP position
+- create_position: user asks to create/open/mint a new LP position. Fill the createGoal object with whatever you can infer (capital.tokenSymbol, capital.amount, riskProfile, exposurePreference, pinnedPair, pinnedFeeTier). Map "passive/safe/cautious" → conservative, "balanced/moderate/neutral" → balanced, "aggressive/active/yolo/degen" → aggressive. Map "stay long X / keep my X / hold my X" → exposurePreference="stay-in-token". Use pinnedFeeTier in basis points (5bps=5, 0.05%=500, 30bps=30, 0.3%=3000, 1%=10000). If the user gave only a token without an amount, set capital.tokenSymbol but leave capital.amount empty so the shell can ask.
 - swap_tokens: user asks for a standalone token swap/trade/conversion
 - prepare_swap: preview a token swap route/quote, without executing it
 - show_quote: show a swap quote or route preview
@@ -32,11 +37,12 @@ Zuno is a terminal-native copilot for Uniswap liquidity providers. Users type pl
 - explain_recommendation: explain why a plan was chosen (needs planId)
 - show_diff: show what changes with a plan (needs planId)
 - simulate_plan: simulate before applying (needs planId)
-- approve_plan: user explicitly approves a stored plan before signing (needs planId)
-- apply_plan: execute an approved plan through Turnkey signing (needs planId)
+- approve_plan: user explicitly approves the latest prepared action before signing (needs planId)
+- apply_plan: execute an approved prepared action through Turnkey signing (needs planId)
 - agent_status: are the watcher/planner/risk agents alive
 - show_peers: connected peers in the agent mesh
 - show_logs: recent agent logs
+- refresh_pools: re-discover the on-chain Uniswap v4 pools available on the current chain (clears cache)
 - monitor_wallet: start or configure background LP monitoring for the Zuno agent wallet
 - show_alerts: show recent monitoring alerts
 - unknown: genuinely nonsensical input
@@ -44,7 +50,7 @@ Zuno is a terminal-native copilot for Uniswap liquidity providers. Users type pl
 
 # Entities
 
-Extract when present: positionId (e.g. "42", "pos_4f2a3b"), planId (e.g. "plan_abc"), amount + tokenSymbol (e.g. "10 usdc"), tokenOutSymbol for swaps, and chainName (mainnet, optimism, base, arbitrum).
+Extract when present: positionId (e.g. "42", "pos_4f2a3b"), planId (e.g. "plan_abc"), amount + tokenSymbol (e.g. "10 usdc"), tokenOutSymbol for swaps, and chainName (${SUPPORTED_CHAIN_NAMES}).
 
 # Rules
 
@@ -57,7 +63,7 @@ Extract when present: positionId (e.g. "42", "pos_4f2a3b"), planId (e.g. "plan_a
 
 export function buildUserMessage(input: string, session: SessionState | undefined): string {
   const ctx = session
-    ? `Session: position=${session.lastPositionId ?? "—"} plan=${session.lastPlanId ?? "—"} approval=${session.approvalState ?? "—"} execution=${session.executionState ?? "—"} userWallet=${session.userWalletAddress ?? "—"} agentWallet=${session.agentWalletAddress ?? "—"}`
+    ? `Session: position=${session.lastPositionId ?? "-"} plan=${session.lastPlanId ?? "-"} approval=${session.approvalState ?? "-"} execution=${session.executionState ?? "-"} userWallet=${session.userWalletAddress ?? "-"} agentWallet=${session.agentWalletAddress ?? "-"}`
     : "Session: (none)";
   return `${ctx}\n\nUser said: ${input}`;
 }

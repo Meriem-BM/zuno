@@ -5,6 +5,7 @@ import {
   POSITION_PATTERNS,
 } from "./rules.js";
 import type { Entities } from "../contracts/types.js";
+import { resolveNetwork } from "@zuno/chain/config";
 
 export function normalize(input: string): string {
   return input
@@ -40,8 +41,8 @@ export function extractEntities(text: string): Entities {
     out.tokenOutSymbol = swapPair[2]!.toLowerCase();
   }
 
-  const chain = text.match(/\b(mainnet|ethereum|optimism|base|arbitrum)\b/iu);
-  if (chain) out.chainName = chain[1]!.toLowerCase();
+  const network = resolveNetwork(text);
+  if (network) out.chainName = network.name.toLowerCase();
 
   return out;
 }

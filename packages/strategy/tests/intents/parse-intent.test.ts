@@ -10,6 +10,7 @@ const baseSession: SessionState = {
   chainId: null,
   lastPositionId: null,
   lastPlanId: null,
+  lastActionId: null,
   lastIntent: null,
   approvalState: "idle",
   executionState: "idle",
@@ -60,6 +61,12 @@ describe("LP workflow intents", () => {
     assert.equal((await parseIntent("apply it", { session: s })).intent, "apply_plan");
   });
 
+  it("treats the latest prepared action as the thing to approve or apply", async () => {
+    const s = session({ lastActionId: "swap_abc" });
+    assert.equal((await parseIntent("approve it", { session: s })).planId, "swap_abc");
+    assert.equal((await parseIntent("apply it", { session: s })).planId, "swap_abc");
+  });
+
   it("asks for a plan before approval or execution", async () => {
     const approve = await parseIntent("approve it");
     assert.equal(approve.intent, "needs_clarification");
@@ -85,6 +92,13 @@ describe("boundaries", () => {
   it("keeps greetings useful", async () => {
     const intent = await parseIntent("hi");
     assert.equal(intent.intent, "help");
+  });
+
+  it("recognizes testnet network names and the spolia typo", async () => {
+    assert.equal((await parseIntent("switch to spolia")).chainName, "sepolia");
+    assert.equal((await parseIntent("switch to base sepolia")).chainName, "base sepolia");
+    assert.equal((await parseIntent("switch to arbitrum sepolia")).chainName, "arbitrum sepolia");
+    assert.equal((await parseIntent("switch to unichain sepolia")).chainName, "unichain sepolia");
   });
 });
 

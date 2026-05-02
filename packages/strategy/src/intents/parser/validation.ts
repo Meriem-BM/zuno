@@ -16,10 +16,12 @@ export function validateIntent(intent: Intent): Intent {
     pendingField: missingField(intent),
     positionId: intent.positionId,
     planId: intent.planId,
+    createGoal: intent.createGoal,
   };
 }
 
 function missingField(intent: Intent): ClarificationField {
+  if (intent.intent === "create_position") return "createCapital";
   if (POSITION_INTENTS.has(intent.intent) && !intent.positionId) return "positionId";
   if (PLAN_INTENTS.has(intent.intent) && !intent.planId) return "planId";
   return "positionId";

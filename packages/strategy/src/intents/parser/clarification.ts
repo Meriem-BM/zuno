@@ -1,5 +1,6 @@
 import type { SessionState } from "@zuno/core";
 import type { Intent, PendingClarification } from "../contracts/types.js";
+import { hasCreateCapital, parseCreateCapitalAnswer } from "./create-goal.js";
 import { validateIntent } from "./validation.js";
 
 export function tryResumePending(
@@ -39,6 +40,27 @@ function fillFromAnswer(input: string, pending: PendingClarification): Partial<I
     case "planId": {
       const m = text.match(/^(plan_[a-z0-9]+|[a-z0-9_-]{4,40})$/iu);
       if (m) return { planId: m[1] };
+      return null;
+    }
+    case "createCapital": {
+      // Accept "0.05 ETH", "ETH 0.05", "1000 USDC", etc. Also accept just a
+      // number if the partial Goal already has a tokenSymbol.
+      const parsed = parseCreateCapitalAnswer(text);
+      if (parsed) {
+        const merged = { ...(pending.createGoal ?? {}), capital: parsed };
+        if (hasCreateCapital(merged)) return { createGoal: merged };
+      }
+      const num = text.match(/^\s*(\d+(?:[.,]\d+)?)\s*$/u);
+      if (num && pending.createGoal?.capital?.tokenSymbol) {
+        const merged = {
+          ...pending.createGoal,
+          capital: {
+            tokenSymbol: pending.createGoal.capital.tokenSymbol,
+            amount: num[1]!.replace(",", "."),
+          },
+        };
+        return { createGoal: merged };
+      }
       return null;
     }
   }

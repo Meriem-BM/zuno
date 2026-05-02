@@ -1,4 +1,4 @@
-import type { SessionState } from "@zuno/core";
+import type { CreateGoal, SessionState } from "@zuno/core";
 
 export type IntentKind =
   | "exit"
@@ -32,18 +32,21 @@ export type IntentKind =
   | "agent_status"
   | "show_peers"
   | "show_logs"
+  | "refresh_pools"
   | "monitor_wallet"
   | "show_alerts"
   | "unknown"
   | "needs_clarification";
 
-export type ClarificationField = "positionId" | "planId";
+export type ClarificationField = "positionId" | "planId" | "createCapital";
 
 export interface PendingClarification {
   intent: IntentKind;
   field: ClarificationField;
   positionId?: string;
   planId?: string;
+  // Partial Goal accumulated across clarification turns.
+  createGoal?: Partial<CreateGoal>;
 }
 
 export interface Entities {
@@ -64,6 +67,8 @@ export interface Intent extends Entities {
   pendingIntent?: IntentKind;
   pendingField?: ClarificationField;
   corrections?: string[];
+  // Filled when intent is "create_position" and Goal extraction succeeded.
+  createGoal?: Partial<CreateGoal>;
 }
 
 export interface IntentScore {

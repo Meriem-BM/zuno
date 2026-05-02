@@ -1,4 +1,5 @@
 import type { Entities, Intent, IntentKind } from "../contracts/types.js";
+import { SUPPORTED_NETWORKS } from "@zuno/chain/config";
 
 interface Signal {
   pattern: RegExp;
@@ -25,6 +26,11 @@ export const PLAN_PATTERNS: RegExp[] = [
 
 export const ADDRESS_PATTERN = /\b(0x[a-f0-9]{40})\b/iu;
 
+const NETWORK_ALIASES = [...new Set(SUPPORTED_NETWORKS.flatMap((network) => network.aliases))]
+  .sort((a, b) => b.length - a.length)
+  .map(escapeRegExp);
+const NETWORK_PATTERN = NETWORK_ALIASES.join("|");
+
 const KNOWN_TOKENS = ["eth", "weth", "usdc", "usdt", "dai", "wbtc"] as const;
 export const AMOUNT_TOKEN_PATTERN = new RegExp(
   `\\b(\\d+(?:\\.\\d+)?)\\s+(${KNOWN_TOKENS.join("|")})\\b`,
@@ -45,10 +51,10 @@ export const POSITION_INTENTS = new Set<IntentKind>([
 export const PLAN_INTENTS = new Set<IntentKind>([
   "show_diff",
   "simulate_plan",
-  "approve_plan",
-  "apply_plan",
   "explain_recommendation",
 ]);
+
+export const ACTION_INTENTS = new Set<IntentKind>(["approve_plan", "apply_plan"]);
 
 export const RULES: Rule[] = [
   {
@@ -303,10 +309,13 @@ export const RULES: Rule[] = [
     signals: [
       {
         pattern:
-          /\b(?:switch|change|move|set)\b.*\b(?:to\s+)?(?:network|chain|mainnet|optimism|base|arbitrum)\b/iu,
+          new RegExp(
+            `\\b(?:switch|change|move|set)\\b.*\\b(?:to\\s+)?(?:network|chain|${NETWORK_PATTERN})\\b`,
+            "iu",
+          ),
         weight: 100,
       },
-      { pattern: /\b(?:use|on)\s+(?:mainnet|optimism|base|arbitrum)\b/iu, weight: 80 },
+      { pattern: new RegExp(`\\b(?:use|on)\\s+(?:${NETWORK_PATTERN})\\b`, "iu"), weight: 80 },
     ],
   },
   {
@@ -365,6 +374,14 @@ export const RULES: Rule[] = [
       { pattern: /\b(?:show|view)\s+(?:recent\s+)?activity\b/iu, weight: 70 },
     ],
   },
+  {
+    intent: "refresh_pools",
+    signals: [
+      { pattern: /\brefresh\s+(?:the\s+)?pools?\b/iu, weight: 95 },
+      { pattern: /\b(?:re-?discover|reload)\s+pools?\b/iu, weight: 90 },
+      { pattern: /\bdiscover\s+pools?\b/iu, weight: 85 },
+    ],
+  },
 ];
 
 export const REQUIRED_FIELDS: Partial<Record<IntentKind, Validator>> = {
@@ -383,6 +400,15 @@ export const REQUIRED_FIELDS: Partial<Record<IntentKind, Validator>> = {
   apply_plan: (i) => {
     if (!i.planId) return "Which plan would you like to apply?";
     return null;
+  },
+  create_position: (i) => {
+    const goal = i.createGoal;
+    const haveToken = Boolean(goal?.capital?.tokenSymbol);
+    const haveAmount = Boolean(goal?.capital?.amount);
+    if (haveToken && haveAmount) return null;
+    if (haveToken && !haveAmount)
+      return `How much ${goal!.capital!.tokenSymbol!.toUpperCase()} do you want to deploy?`;
+    return "Which token and how much do you want to deploy? (e.g. \"0.05 ETH\" or \"1000 USDC\")";
   },
 };
 
@@ -485,3 +511,7 @@ export const KEYWORD_VOCAB: ReadonlyArray<string> = [
   "which",
   "any",
 ];
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
