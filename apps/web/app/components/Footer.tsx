@@ -1,34 +1,32 @@
 export function Footer() {
   return (
-    <footer className="relative pb-16 pt-32">
+    <footer className="relative pb-16 pt-28">
       <div className="hairline mx-auto mb-16 w-full max-w-6xl px-8" />
 
       <div className="mx-auto max-w-3xl px-8 text-center">
-        <p className="font-fraunces text-[26px] leading-[1.4] text-fg sm:text-[30px]">
+        <p className="font-mono font-semibold text-[22px] leading-[1.45] tracking-[-0.02em] text-fg sm:text-[26px]">
           <em className="italic" style={{ fontStyle: "italic" }}>
             Multi-agent
           </em>{" "}
-          isn&apos;t a feature of Zuno. <span className="text-fg-2">It is the workflow.</span>
+          isn&apos;t a feature of Zuno.{" "}
+          <span className="text-fg-2">It is the workflow.</span>
         </p>
       </div>
 
-      <div className="mx-auto mt-20 flex w-full max-w-6xl items-center justify-between px-8 font-jetbrains text-[11px] text-muted">
+      <div className="mx-auto mt-20 flex w-full max-w-6xl flex-wrap items-center justify-between gap-y-3 px-8 font-jetbrains text-[11px] text-muted">
         <div className="flex items-center gap-2">
-          <span className="block h-[6px] w-[6px] rounded-full bg-pink" />
-          <span>zuno · v0.1</span>
+          <span className="block h-[6px] w-[6px] rounded-full bg-pink axl-pulse" />
+          <span>zuno · uniswap v4</span>
         </div>
         <div className="flex gap-6">
-          <a href="#" className="transition hover:text-fg">
+          <a href="https://github.com/Meriem-BM/zuno" className="link-sweep transition hover:text-fg">
             github
           </a>
-          <a href="#" className="transition hover:text-fg">
+          <a href="/docs" className="link-sweep transition hover:text-fg">
             docs
           </a>
-          <a href="#" className="transition hover:text-fg">
-            x
-          </a>
         </div>
-        <span>built for uniswap v3 / v4</span>
+        <span>$ npm i -g zuno</span>
       </div>
     </footer>
   );

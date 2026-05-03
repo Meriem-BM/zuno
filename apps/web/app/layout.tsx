@@ -1,8 +1,16 @@
 import type { Metadata, Viewport } from "next";
+import { IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-plex-mono",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "Zuno, a terminal-native copilot for Uniswap LPs",
+  title: "Zuno",
   description:
     "Zuno uses a small network of AXL-connected agents to inspect positions, debate rebalances, and produce execution-ready liquidity plans.",
   metadataBase: new URL("https://zuno.dev"),
@@ -20,8 +28,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="grain">{children}</body>
+    <html lang="en" className={plexMono.variable}>
+      <body>{children}</body>
     </html>
   );
 }

@@ -11,12 +11,11 @@
   --color-pink: #ff8fb1;
   --color-pink-deep: #e96a91;
 
-  --font-fraunces: ui-serif, Georgia, "Times New Roman", serif;
   --font-geist: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-jetbrains: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --font-display: var(--font-fraunces);
+  --font-jetbrains: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --font-sans: var(--font-geist);
   --font-mono: var(--font-jetbrains);
+  --font-display: var(--font-jetbrains);
 }
 
 @layer base {
@@ -47,9 +46,8 @@
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 100;
-  opacity: 0.035;
-  mix-blend-mode: overlay;
+  z-index: 1;
+  opacity: 0.04;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
 }
 
@@ -70,27 +68,8 @@
   );
 }
 
-.sheen {
-  position: relative;
-  overflow: hidden;
-}
-.sheen::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    115deg,
-    transparent 30%,
-    rgba(255, 143, 177, 0.06) 48%,
-    transparent 64%
-  );
-  transform: translateX(-100%);
-  animation: sheen 6.5s ease-in-out infinite;
-  pointer-events: none;
-}
-
 /* ---------------------------------------------------------------------------
-   Entrance — staggered rise
+   Entrance - staggered rise
    --------------------------------------------------------------------------- */
 
 @keyframes rise {
@@ -124,9 +103,6 @@
 .rise-5 {
   animation-delay: 0.6s;
 }
-.rise-6 {
-  animation-delay: 0.78s;
-}
 
 /* Slow line-by-line reveal for terminal output */
 .cascade > * {
@@ -159,7 +135,7 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Loops — terminal cursor, axl pulse, sheen, packet flow, mesh shimmer
+   Loops - terminal cursor, axl pulse, sheen, packet flow, mesh shimmer
    --------------------------------------------------------------------------- */
 
 @keyframes blink {
@@ -192,65 +168,9 @@
   transform-origin: center;
 }
 
-@keyframes sheen {
-  0% {
-    transform: translateX(-100%);
-  }
-  60%,
-  100% {
-    transform: translateX(120%);
-  }
-}
-
-/* Pink request packet sliding along the architecture flow */
-@keyframes packet-flow {
-  0% {
-    offset-distance: 0%;
-    opacity: 0;
-  }
-  6% {
-    opacity: 1;
-  }
-  92% {
-    opacity: 1;
-  }
-  100% {
-    offset-distance: 100%;
-    opacity: 0;
-  }
-}
-.packet {
-  animation: packet-flow 5.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-
-/* Faint shimmer over mesh edges */
-@keyframes mesh-shimmer {
-  0%,
-  100% {
-    stroke-opacity: 0.18;
-  }
-  50% {
-    stroke-opacity: 0.5;
-  }
-}
-.mesh-shimmer {
-  animation: mesh-shimmer 4.5s ease-in-out infinite;
-}
-
 /* ---------------------------------------------------------------------------
-   Interactions — hover lift, link sweep
+   Interactions - link sweep
    --------------------------------------------------------------------------- */
-
-.lift {
-  transition:
-    transform 320ms cubic-bezier(0.2, 0.7, 0.2, 1),
-    border-color 320ms,
-    background 320ms;
-}
-.lift:hover {
-  transform: translateY(-2px);
-  border-color: var(--color-fg-2);
-}
 
 .link-sweep {
   background-image: linear-gradient(var(--color-pink), var(--color-pink));
@@ -263,41 +183,12 @@
   background-size: 100% 1px;
 }
 
-/* ---------------------------------------------------------------------------
-   Nav backdrop on scroll
-   --------------------------------------------------------------------------- */
-
-.nav-blur {
-  backdrop-filter: blur(10px) saturate(140%);
-  -webkit-backdrop-filter: blur(10px) saturate(140%);
-  background: rgba(10, 10, 11, 0.65);
-  border-bottom: 1px solid color-mix(in srgb, var(--color-line) 60%, transparent);
-}
-
-/* Mini live-mesh indicator (hero) */
-@keyframes mini-orbit {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-.mini-orbit {
-  animation: mini-orbit 14s linear infinite;
-  transform-origin: center;
-}
-
-/* Reduce motion — respect users that ask for stillness */
+/* Reduce motion - respect users that ask for stillness */
 @media (prefers-reduced-motion: reduce) {
   .rise,
   .cascade > *,
   .blink,
-  .axl-pulse,
-  .sheen::after,
-  .packet,
-  .mesh-shimmer,
-  .mini-orbit {
+  .axl-pulse {
     animation: none !important;
   }
   .rise,

@@ -1,7 +1,8 @@
+import { Agents } from "./components/Agents";
 import { Architecture } from "./components/Architecture";
+import { Capabilities } from "./components/Capabilities";
 import { Footer } from "./components/Footer";
 import { Hero } from "./components/Hero";
-import { HowItWorks } from "./components/HowItWorks";
 import { Nav } from "./components/Nav";
 import { WhyItMatters } from "./components/WhyItMatters";
 
@@ -11,11 +12,13 @@ export default function Home() {
       <Nav />
       <Hero />
       <div className="hairline mx-auto w-full max-w-6xl px-8" />
-      <HowItWorks />
+      <Capabilities />
       <div className="hairline mx-auto w-full max-w-6xl px-8" />
-      <WhyItMatters />
+      <Agents />
       <div className="hairline mx-auto w-full max-w-6xl px-8" />
       <Architecture />
+      <div className="hairline mx-auto w-full max-w-6xl px-8" />
+      <WhyItMatters />
       <Footer />
     </main>
   );

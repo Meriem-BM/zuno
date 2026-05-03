@@ -1,7 +1,7 @@
 export function Terminal() {
   return (
-    <div className="font-jetbrains text-[12.5px] leading-[1.7]">
-      <div className="sheen overflow-hidden rounded-md border border-line bg-[#08080a] shadow-[0_30px_80px_-30px_rgba(0,0,0,0.8)]">
+    <div className="font-jetbrains text-[12px] leading-[1.65]">
+      <div className="overflow-hidden rounded-md border border-line bg-[#08080a] shadow-[0_30px_80px_-30px_rgba(0,0,0,0.8)]">
         {/* title bar */}
         <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
           <div className="flex gap-1.5">
@@ -14,21 +14,23 @@ export function Terminal() {
         </div>
 
         {/* body */}
-        <div className="cascade px-6 py-5 text-fg-2">
+        <div className="cascade space-y-[2px] px-5 py-5 text-fg-2">
           <div className="text-fg">
             <span className="text-pink">$</span> recommend rebalance{" "}
             <span className="text-pink">pos_4f2a3b</span>
           </div>
 
-          <div className="mt-4 space-y-1 text-muted">
-            <Line label="watcher" value="reading position pos_4f2a3b" />
-            <Line label="planner" value="proposing 2 candidates" />
-            <Line label="risk" value="critiquing, vetoing tighten" />
+          <div className="mt-3 space-y-[2px] text-muted">
+            <Line label="scout" value="ranging · 110bps · 14gwei · in range" />
+            <Line label="strategist" value="3 candidates · lean tighter" />
+            <Line label="critic" value="reject A: 18h buffer, vol mean-reverts" />
+            <Line label="strategist" value="A': ±2.6% · 28h buffer · $3.60/d" />
+            <Line label="critic" value="accept A' · converged" />
           </div>
 
-          <div className="my-5 h-px bg-line" />
+          <div className="my-4 h-px bg-line" />
 
-          <div className="space-y-1.5">
+          <div className="space-y-[2px]">
             <Row k="position" v="USDC / ETH 0.05%" />
             <Row
               k="range"
@@ -38,9 +40,9 @@ export function Terminal() {
             <Row k="current" v="2,073.62" />
           </div>
 
-          <div className="my-5 h-px bg-line" />
+          <div className="my-4 h-px bg-line" />
 
-          <div className="space-y-1.5">
+          <div className="space-y-[2px]">
             <Row
               k="recommended"
               v="1,940 → 2,210"
@@ -49,26 +51,27 @@ export function Terminal() {
             <Row
               k="rejected"
               v="1,995 → 2,150"
-              suffix={<span className="text-muted">too tight</span>}
+              suffix={<span className="text-muted">too tight at 2× vol</span>}
             />
-            <Row k="reason" v="< 36h buffer at recent volatility" valueClass="text-fg-2" />
-            <Row k="signer" v="zuno wallet · turnkey" valueClass="text-fg-2" />
+            <Row k="reason" v="28h buffer · survives 2× vol" />
+            <Row k="decided by" v="critic · debate converged" />
+            <Row k="signer" v="zuno wallet · turnkey" />
           </div>
 
-          <div className="my-5 h-px bg-line" />
+          <div className="my-4 h-px bg-line" />
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="text-muted">verdict</span>
             <span className="text-pink">approve_with_caution</span>
             <span className="text-faint">·</span>
-            <span className="text-muted">confidence</span>
+            <span className="text-muted">conf</span>
             <span className="text-fg">0.82</span>
             <span className="text-faint">·</span>
             <span className="text-muted">approval</span>
             <span className="text-fg">human</span>
           </div>
 
-          <div className="mt-6 text-fg">
+          <div className="mt-5 text-fg">
             <span className="text-pink">$</span>
             <span className="ml-2 inline-block h-[12px] w-[7px] translate-y-px bg-fg blink" />
           </div>
@@ -80,10 +83,10 @@ export function Terminal() {
 
 function Line({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex gap-3">
+    <div className="flex items-baseline gap-3">
       <span className="text-pink">◇</span>
-      <span className="w-[68px] text-muted">{label}</span>
-      <span className="text-fg-2">{value}</span>
+      <span className="w-[78px] shrink-0 text-muted">{label}</span>
+      <span className="truncate text-fg-2">{value}</span>
     </div>
   );
 }
@@ -92,18 +95,16 @@ function Row({
   k,
   v,
   suffix,
-  valueClass,
 }: {
   k: string;
   v: string;
   suffix?: React.ReactNode;
-  valueClass?: string;
 }) {
   return (
-    <div className="flex flex-wrap items-baseline gap-x-4">
-      <span className="w-[110px] text-muted">{k}</span>
-      <span className={valueClass ?? "text-fg"}>{v}</span>
-      {suffix ? <span className="ml-2">{suffix}</span> : null}
+    <div className="flex items-baseline gap-3">
+      <span className="w-[96px] shrink-0 text-muted">{k}</span>
+      <span className="text-fg">{v}</span>
+      {suffix ? <span className="ml-1 truncate">{suffix}</span> : null}
     </div>
   );
 }
