@@ -11,20 +11,23 @@ show my zuno wallet
 fund my zuno wallet
 inspect my positions
 inspect position <tokenId>
+create a position with 0.05 ETH passively
 recommend what I should do with this position
 show me the diff
 simulate it
 approve it
 apply it
+refresh pools
 show alerts
 ```
 
 | intent       | summary                                                      |
 |--------------|--------------------------------------------------------------|
 | wallet       | Create, inspect, fund, and check the Turnkey-backed Zuno wallet |
-| positions    | List Uniswap v3 NFT positions held by the Zuno wallet        |
+| positions    | List Uniswap v4 positions held by the Zuno wallet            |
 | inspect      | Print one position snapshot: range, current tick, status     |
-| recommend    | Run Watcher → Planner → Risk when AXL is online, else local  |
+| create       | Open a brand-new position via the four-agent debate          |
+| recommend    | Rebalance an existing position via the four-agent debate     |
 | diff         | Re-render before/after range and inventory changes           |
 | simulate     | Preview deterministic execution steps before signing         |
 | approve      | Human approval before any state-changing action              |
@@ -38,8 +41,9 @@ across sessions.
 
 - The CLI is itself an AXL peer for recommendation flows. Direct reads,
   diffs, simulation, and wallet state stay outside AXL.
-- If the mesh is not online, recommendation uses the same deterministic
-  planner locally and still stores the plan.
+- If the mesh is not online, recommendation runs the same four-agent
+  debate in-process. If no LLM is available either, the deterministic
+  `recommendPlan` math runs as a final fallback. Plans persist either way.
 - Continuous monitoring runs as `pnpm monitor`; the shell stays the control
   surface and reads alerts with `show alerts`.
 - Output is plain ANSI. No colour-stripping needed for piping.

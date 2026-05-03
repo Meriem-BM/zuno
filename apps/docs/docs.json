@@ -3,6 +3,7 @@
   "theme": "mint",
   "name": "zuno",
   "description": "Terminal-native copilot for Uniswap LPs.",
+  "favicon": "/favicon.png",
   "colors": {
     "primary": "#FF8FB1",
     "light": "#FF8FB1",
@@ -24,6 +25,7 @@
           "cli/overview",
           "cli/wallet",
           "cli/inspect",
+          "cli/create",
           "cli/plan",
           "cli/diff",
           "cli/monitor"
@@ -34,7 +36,8 @@
         "pages": [
           "architecture/mesh",
           "architecture/agents",
-          "architecture/axl"
+          "architecture/axl",
+          "architecture/execution"
         ]
       }
     ]

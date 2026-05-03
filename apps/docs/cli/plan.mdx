@@ -1,35 +1,50 @@
 ---
 title: zuno plan
-description: Run the full agent flow and produce a rebalance plan.
+description: Run the four-agent debate and produce a rebalance plan.
 ---
 
 ```
 recommend what I should do with this position
 ```
 
-The headline workflow. When the AXL mesh is online, the CLI sends the request
-through Watcher → Planner → Risk and returns a structured, persisted plan. If
-the mesh is not online, the same deterministic planner runs locally so the LP
-workflow remains usable.
+The headline workflow. When the AXL mesh is online, the CLI sends the
+request through Scout → Strategist ↔ Critic → (Arbiter on deadlock)
+and returns a structured, persisted plan with the full debate
+transcript attached. If the mesh is not online, an in-process
+orchestrator runs the same four handlers; if no LLM is available, the
+deterministic `recommendPlan` math runs as a final fallback.
 
 ## What happens
 
-1. CLI sends a `flow_run` envelope to the **Watcher** peer.
-2. **Watcher** reads the position + pool tick state, sends a `flow_run`
-   to the **Planner** with the position snapshot.
-3. **Planner** generates one or two candidate rebalance ranges
-   (deterministic, see [Architecture / Agents](/architecture/agents)),
-   forwards a `flow_review` to **Risk**.
-4. **Risk** scores each candidate, vetoes any with insufficient buffer,
-   picks a winner, and emits `flow_run:done` back to the CLI peer.
-5. CLI prints the result and writes `~/.zuno/plans/<planId>.json`.
+1. CLI sends a `flow_start` envelope to **Scout**.
+2. **Scout** reads the position + pool tick state, loads vol / gas /
+   yield, classifies the regime (`ranging` / `trending` / `volatile` /
+   `stressed`), and forwards `context_observed` to **Strategist**.
+3. **Strategist** proposes 2-5 candidate ranges as
+   `(widthMultiplier, centerOffsetTicks)` tuples (snapped to
+   `tickSpacing`), each with stress + yield numbers. Forwards
+   `proposal` to **Critic**.
+4. **Critic** runs deterministic stress (1×, 2×, 3× vol), gas/yield
+   ratios, and judges each candidate `accept` | `revise` | `veto`
+   against the user's risk profile.
+   - On `accept`: emits `plan_ready` to the CLI, flow ends.
+   - On `revise`: forwards `critique` back to Strategist for round 2.
+   - On `veto_all` past `ZUNO_MAX_DEBATE_ROUNDS`: emits `deadlock` to
+     **Arbiter**.
+5. **Arbiter** (on deadlock) reads the full debate, picks one candidate
+   from the latest proposal, and emits `plan_ready` to the CLI.
+6. CLI prints the result and writes `~/.zuno/plans/<planId>.json` with
+   the transcript baked into `risk.reasons`.
 
-The CLI shows progress events as each agent acts:
+The CLI streams `agent_thought` envelopes throughout, rendering each
+turn live under the recommendation card:
 
 ```
-  ◇ watcher  read       pos_4f2a3b
-  ◇ planner  propose
-  ◇ risk     critique   2 candidates
+  ◇ scout       regime: ranging · vol 110bps · gas 14gwei · in range
+  ◇ strategist  3 candidates · lean tighter, vol is sleeping
+  ◇ critic      reject A: 18h buffer is fine now, vol mean-reverts
+  ◇ strategist  A′: ±2.6% · 28h buffer · $3.60/d expected
+  ◇ critic      accept A′ - converged
 ```
 
 ## Example output
@@ -44,18 +59,40 @@ $ recommend what I should do with this position
   ────────────────────────────────────────────────────────
 
   recommended 2,273.36 to 2,614.97   shift
-  rejected    2,361.41 to 2,519.99   tighten
-  reason      less than 36h of buffer at recent volatility
+  rejected    2,361.41 to 2,519.99   tighten at 2× vol
+  reason      28h base buffer · survives 2× vol · gas/yield 0.71x
+  decided by  critic · debate converged
 
   confidence  0.82  approve_with_caution
 
   plan id     plan_dd4f9e0b6806
 ```
 
+## Risk profile
+
+Set `ZUNO_RISK_PROFILE` to bias the Critic's floors and the Arbiter's
+tiebreak:
+
+| profile        | min base buffer | max gas/yield | tiebreak                                  |
+| -------------- | --------------- | ------------- | ----------------------------------------- |
+| `conservative` | 36h             | 1.2x          | largest 2× vol buffer wins                |
+| `balanced`     | 24h             | 1.6x          | best buffer × yield balance               |
+| `aggressive`   | 14h             | 2.4x          | highest yield among non-vetoed candidates |
+
 ## Confidence labels
 
-| label                  | meaning                                          |
-|------------------------|--------------------------------------------------|
-| `approve`              | clear win, low risk                              |
-| `approve_with_caution` | acceptable, but Risk flagged at least one note   |
-| `reject`               | no candidate cleared the review                 |
+| label                  | meaning                                                  |
+| ---------------------- | -------------------------------------------------------- |
+| `approve`              | converged with strong buffer                             |
+| `approve_with_caution` | converged but buffer is tight, or arbiter broke deadlock |
+| `reject`               | every candidate failed stress at the active risk profile |
+
+## Replaying the debate
+
+```
+explain recommendation
+```
+
+Renders `risk.reasons`, which includes every `[scout]` / `[strategist]`
+/ `[critic]` / `[arbiter]` line from the original flow. The transcript
+is persisted with the plan so you can read the reasoning later.

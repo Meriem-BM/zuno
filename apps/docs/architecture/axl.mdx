@@ -1,39 +1,80 @@
 ---
 title: AXL, the transport
-description: How Zuno talks to the Gensyn Agent eXchange Layer.
+description: Why AXL is the coordination layer for Zuno.
 ---
 
 [Gensyn AXL](https://blog.gensyn.ai/introducing-axl/) is a peer-to-peer
 transport for agents. ed25519 peer ids, HTTP API on `localhost:9002`,
 endpoints `POST /send`, `GET /recv`, `GET /topology`.
 
-Zuno treats AXL as the only way agents talk to each other. That's a
-deliberate choice, without it, "multi-agent" is just function calls
-wearing a costume.
+Zuno treats AXL as the coordination layer for a multi-agent **debate**,
+not a one-shot pipeline. Without it, "multi-agent" is just function
+calls wearing a costume.
 
 ## What ships in the box
 
-- `packages/strategy/src/axl/transport/client.ts`: `AxlClient` with `register`, `send`,
-  `request`, `recv`, `topology`, `listen`.
-- `packages/strategy/src/axl/transport/discovery.ts`: reads the configured peer ids for
-  `watcher`, `planner`, `risk`, and `cli`.
+- `packages/strategy/src/axl/transport/client.ts`: `AxlClient` with
+  `send`, `request`, `recv`, `topology`, `listen`.
+- `packages/strategy/src/axl/transport/discovery.ts`: reads configured
+  peer ids for `cli`, `scout`, `strategist`, `critic`, `arbiter`.
+
+## Why it matters in Zuno
+
+- The CLI is a peer, not a special case.
+- Scout, Strategist, Critic, and Arbiter exchange envelopes directly -
+  no central queue, no orchestrator process.
+- Strategist ↔ Critic loops over multiple rounds; Arbiter only joins on
+  deadlock. AXL routing makes that pattern natural; HTTP request/response
+  would force a heavier coordinator.
+- Roles are open: anyone with a peer id can plug in a competing
+  Strategist or Critic, and the position owner picks which they trust.
 
 ## Configuration
 
 Zuno expects real AXL nodes and real peer ids:
 
 ```bash
-export ZUNO_AXL_URL=http://localhost:9002
+export ZUNO_AXL_CLI_API_URL=http://127.0.0.1:9002
+export ZUNO_AXL_SCOUT_API_URL=http://127.0.0.1:9012
+export ZUNO_AXL_STRATEGIST_API_URL=http://127.0.0.1:9022
+export ZUNO_AXL_CRITIC_API_URL=http://127.0.0.1:9032
+export ZUNO_AXL_ARBITER_API_URL=http://127.0.0.1:9042
+
 export ZUNO_AXL_CLI_PEER_ID=...
-export ZUNO_AXL_WATCHER_PEER_ID=...
-export ZUNO_AXL_PLANNER_PEER_ID=...
-export ZUNO_AXL_RISK_PEER_ID=...
+export ZUNO_AXL_SCOUT_PEER_ID=...
+export ZUNO_AXL_STRATEGIST_PEER_ID=...
+export ZUNO_AXL_CRITIC_PEER_ID=...
+export ZUNO_AXL_ARBITER_PEER_ID=...
 ```
+
+Generate keys and config with `bash tooling/axl-bootstrap.sh`, then run
+each agent in its own terminal:
+
+```bash
+pnpm --filter @zuno/strategy start:scout
+pnpm --filter @zuno/strategy start:strategist
+pnpm --filter @zuno/strategy start:critic
+pnpm --filter @zuno/strategy start:arbiter
+```
+
+## Envelope kinds
+
+| kind | from | to | meaning |
+|---|---|---|---|
+| `flow_start` | cli | scout | start a recommendation |
+| `context_observed` | scout | strategist | regime + market context |
+| `proposal` | strategist | critic | initial candidate set |
+| `critique` | critic | strategist | revise feedback per candidate |
+| `revision` | strategist | critic | revised candidate set |
+| `deadlock` | critic | arbiter | no convergence after maxRounds |
+| `plan_ready` | critic\|arbiter | cli | final plan |
+| `flow_failed` | any | cli | unrecoverable error |
+| `agent_thought` | any | cli | live narration line |
 
 ## Why long-poll instead of websockets
 
 Long-poll matches what the real Gensyn AXL node does. Switching the
-transport to websockets later would be a `client.ts` change only, the
+transport to websockets later would be a `client.ts` change only - the
 agent code never sees the wire.
 
 ## Inspecting the mesh
@@ -42,5 +83,7 @@ agent code never sees the wire.
 curl http://localhost:9002/topology | jq
 ```
 
-Lists currently-registered peers and their roles. The CLI uses this on
-startup to confirm the Watcher is reachable before sending a `flow_run`.
+The CLI uses this on startup to confirm all four agent peers are
+reachable before sending `flow_start`. If any are missing, the CLI
+falls back to the in-process debate orchestrator (same handlers, same
+prompts) so the demo still works.

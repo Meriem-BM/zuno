@@ -1,6 +1,6 @@
 ---
 title: Quickstart
-description: Boot the full mesh and run a plan in under a minute.
+description: Boot the four-agent debate mesh and run a recommendation in under a minute.
 ---
 
 ## Prerequisites
@@ -17,7 +17,7 @@ cd zuno
 pnpm install
 ```
 
-Configure the Turnkey-backed Zuno wallet and chain:
+Configure the Turnkey-backed Zuno wallet, chain, and AXL peer ids:
 
 ```bash
 export ZUNO_AGENT_WALLET_ADDRESS=0x...
@@ -27,11 +27,16 @@ export ZUNO_MONITOR_INTERVAL_MS=60000
 export TURNKEY_ORGANIZATION_ID=...
 export TURNKEY_API_PUBLIC_KEY=...
 export TURNKEY_API_PRIVATE_KEY=...
-export ZUNO_AXL_URL=http://localhost:9002
+
+# AXL peer ids (one per role, plus the cli)
 export ZUNO_AXL_CLI_PEER_ID=...
-export ZUNO_AXL_WATCHER_PEER_ID=...
-export ZUNO_AXL_PLANNER_PEER_ID=...
-export ZUNO_AXL_RISK_PEER_ID=...
+export ZUNO_AXL_SCOUT_PEER_ID=...
+export ZUNO_AXL_STRATEGIST_PEER_ID=...
+export ZUNO_AXL_CRITIC_PEER_ID=...
+export ZUNO_AXL_ARBITER_PEER_ID=...
+
+# Required for the LLM debate. Falls back to deterministic when unset.
+export OPENAI_API_KEY=sk-...
 ```
 
 Optional Telegram notifications for the monitor:
@@ -41,38 +46,49 @@ export ZUNO_TELEGRAM_BOT_TOKEN=
 export ZUNO_TELEGRAM_CHAT_ID=
 ```
 
-Optional: enable model fallback for loose natural-language intent routing.
-The deterministic parser still runs first.
+Optional: tune the debate.
 
 ```bash
-# Cheap hosted fallback
-export ZUNO_INTENT_PROVIDER=groq
-export GROQ_API_KEY=...
-export ZUNO_INTENT_MODEL=llama-3.1-8b-instant
-
-# Useful when validating provider errors
-export ZUNO_DEBUG_INTENTS=true
+export ZUNO_RISK_PROFILE=balanced       # conservative | balanced | aggressive
+export ZUNO_MAX_DEBATE_ROUNDS=2         # strategist↔critic rounds before arbiter
+export ZUNO_AGENT_MODEL=gpt-4o-mini     # any OpenAI model with structured outputs
+export ZUNO_DETERMINISTIC=false         # set "true" to bypass the LLM entirely
 ```
 
-## Manual: four terminals
+## All four agents in one command
 
-If you want to watch each agent independently:
+```bash
+pnpm --filter @zuno/strategy start:agents
+```
+
+Then in a second terminal:
+
+```bash
+pnpm cli
+```
+
+## Manual: five terminals
+
+If you want each agent's log stream separately:
 
 ```bash
 # terminal 1
 axl
 
 # terminal 2
-pnpm watcher
+pnpm --filter @zuno/strategy start:scout
 
 # terminal 3
-pnpm planner
+pnpm --filter @zuno/strategy start:strategist
 
 # terminal 4
-pnpm risk
+pnpm --filter @zuno/strategy start:critic
+
+# terminal 5
+pnpm --filter @zuno/strategy start:arbiter
 ```
 
-Then, in a fifth terminal:
+Then, in a sixth terminal:
 
 ```bash
 pnpm cli
@@ -86,6 +102,13 @@ show my zuno wallet
 fund my zuno wallet
 inspect my positions
 inspect position 42
+
+# Open a brand-new position via the four-agent debate:
+create a position with 0.05 ETH passively
+approve it
+apply it
+
+# Or rebalance an existing one:
 recommend what I should do with this position
 show me the diff
 simulate it
@@ -108,20 +131,14 @@ show alerts
 show my zuno wallet
 ```
 
-## AXL
+## Without the mesh
 
-Zuno expects real AXL nodes. Configure the local node URL and each role's peer id:
+If the four agent peers aren't visible on AXL, the CLI falls back to an
+in-process orchestrator that runs the same four handlers in one Node
+process. Same prompts, same deterministic tools, same transcript. The
+demo works either way.
 
-```bash
-export ZUNO_AXL_URL=http://localhost:9002
-export ZUNO_AXL_CLI_PEER_ID=...
-export ZUNO_AXL_WATCHER_PEER_ID=...
-export ZUNO_AXL_PLANNER_PEER_ID=...
-export ZUNO_AXL_RISK_PEER_ID=...
-```
-
-## Landing page
-
-```bash
-pnpm web       # http://localhost:3030
-```
+If `OPENAI_API_KEY` is also unset (or `ZUNO_DETERMINISTIC=true`), the
+recommendation falls back further to the deterministic `recommendPlan`
+math - the legacy 1.4×/0.65× candidate generator with threshold-rule
+critique.

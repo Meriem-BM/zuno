@@ -1,54 +1,110 @@
 ---
 title: Monitoring
-description: Run Zuno as a background LP watcher.
+description: Run Zuno as a background LP watcher with optional Telegram alerts.
 ---
 
 The interactive shell is the control surface. Continuous monitoring runs as a
-separate worker:
+separate worker process - it is **not** part of the four-agent debate; it is a
+standalone watcher that polls positions and writes alerts.
 
 ```bash
 pnpm monitor
 ```
 
-The worker reads the configured Zuno wallet, polls Uniswap v3 positions, detects
-out-of-range or near-boundary positions, writes local alerts, and can optionally
-send Telegram notifications.
+The worker:
+
+1. Resolves the Zuno wallet (from your CLI session at `~/.zuno/session.json` or
+   `ZUNO_AGENT_WALLET_ADDRESS`).
+2. Lists Uniswap v4 positions held by that wallet.
+3. Builds a snapshot for each position and runs `isRiskyPosition`.
+4. For new risk conditions, writes a `PositionAlert` to `~/.zuno/alerts.json`
+   and (optionally) pings Telegram.
+5. Repeats every `ZUNO_MONITOR_INTERVAL_MS` (default 60s, floor 5s).
+
+Code lives in `packages/strategy/src/monitor/`.
+
+## Risk thresholds
+
+| condition                                | severity   | kind             |
+| ---------------------------------------- | ---------- | ---------------- |
+| out of range                             | `critical` | `out_of_range`   |
+| in range, utilization < 15% or > 85%     | `warning`  | `near_boundary`  |
+| in range, utilization 15-85%             | -          | not risky        |
+
+`isRiskyPosition` and `riskReason` live in `@zuno/chain/uniswap`; both monitor
+and the agent debate consult them so the language stays consistent.
+
+## Dedup
+
+Each tick checks the latest unacknowledged alert for the position. A new
+alert only fires when:
+
+- there is no prior alert for the position, or
+- the prior alert was acknowledged, or
+- the `kind` or `reason` changed.
+
+This prevents the same out-of-range condition from re-pinging every minute.
+
+## Telegram delivery
+
+Telegram is **optional**. When unset, the monitor still runs and writes alerts
+locally; only the push channel is disabled.
+
+```bash
+ZUNO_TELEGRAM_BOT_TOKEN=<from @BotFather>
+ZUNO_TELEGRAM_CHAT_ID=<numeric chat id>
+ZUNO_TELEGRAM_API_BASE_URL=https://api.telegram.org   # optional override
+```
+
+### Setup
+
+1. Message [@BotFather](https://t.me/BotFather), `/newbot`, save the token.
+2. Send your new bot one message from the chat where you want alerts (DM or
+   group; for groups, add the bot first).
+3. Hit `https://api.telegram.org/bot<TOKEN>/getUpdates`, copy
+   `result[0].message.chat.id`.
+4. Set both env vars and run `pnpm monitor`.
+
+### What gets sent
+
+The monitor calls the bot's `sendMessage` endpoint with HTML-formatted text:
 
 ```
-~/.zuno/alerts.json
+<b>Zuno LP alert</b>
+severity: <b>CRITICAL</b>
+chain: Sepolia
+wallet: <code>0xabcd...1234</code>
+position: <code>42</code>
+condition: out of range
+reason: out of range
+
+WETH/USDC position 42 is out of range: out of range
 ```
 
-Inside `zuno`, use:
+If Telegram returns a non-2xx response, the monitor logs the error and
+continues to the next position; one bad delivery never crashes the watcher.
+
+## CLI commands
+
+Inside `zuno`:
 
 ```
-show alerts
+show alerts        # render recent alerts (~10 most recent)
 show my zuno wallet
 ```
 
-`show my zuno wallet` verifies wallet configuration.
-`show alerts` renders recent alerts without dumping JSON.
+`show alerts` reads from the same `~/.zuno/alerts.json` the monitor writes to,
+so the shell sees alerts the moment the worker writes them.
 
-## Environment
-
-```bash
-ZUNO_AGENT_WALLET_ADDRESS=0x...
-ZUNO_CHAIN_ID=42161
-ZUNO_ARBITRUM_RPC_URL=https://...
-ZUNO_MONITOR_INTERVAL_MS=60000
-```
-
-## Telegram
-
-Telegram is optional. When these vars are unset, the monitor stays local-only.
+## Required environment
 
 ```bash
-ZUNO_TELEGRAM_BOT_TOKEN=...
-ZUNO_TELEGRAM_CHAT_ID=...
+ZUNO_AGENT_WALLET_ADDRESS=0x...           # or sign in via CLI first
+ZUNO_CHAIN_ID=42161                       # mainnet defaults vary; pick yours
+ZUNO_ARBITRUM_RPC_URL=https://...         # any chain-specific RPC URL
+ZUNO_MONITOR_INTERVAL_MS=60000            # floor 5000
 ```
 
-Create a bot with BotFather, send the bot one message from the target chat, then
-use that chat id. The monitor sends only newly-created alerts; repeated checks of
-the same unacknowledged condition are deduped.
-
-The monitor never signs transactions. It only reads positions and writes local
-advisory alerts.
+The monitor never signs transactions. It only reads positions and writes
+local advisory alerts. Acting on an alert is always a manual step:
+`recommend rebalance` → `approve it` → `apply it`.

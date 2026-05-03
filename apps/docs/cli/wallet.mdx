@@ -28,6 +28,12 @@ $ inspect my positions
 
 - Output includes a quick range indicator. Use `inspect position <id>` for
   the full snapshot.
-- Position reads are direct viem reads. Recommendations use Watcher → Planner
-  → Risk over AXL when the mesh is online.
-- The terminal never receives or stores raw private keys.
+- Position reads are direct viem reads. Recommendations run the
+  Scout → Strategist ↔ Critic → (Arbiter on deadlock) debate over AXL
+  when the mesh is online.
+- The terminal never receives or stores raw private keys. Turnkey holds
+  the wallet's signing key inside its secure enclave; the CLI holds only
+  short-lived (1h) session API credentials. See
+  [Architecture / Execution and signing](/architecture/execution) for
+  the full pipeline from `apply` to on-chain submission, including the
+  policy gate that runs before Turnkey ever sees the request.
