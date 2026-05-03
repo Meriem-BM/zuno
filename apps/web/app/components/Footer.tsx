@@ -8,8 +8,7 @@ export function Footer() {
           <em className="italic" style={{ fontStyle: "italic" }}>
             Multi-agent
           </em>{" "}
-          isn&apos;t a feature of Zuno.{" "}
-          <span className="text-fg-2">It is the workflow.</span>
+          isn&apos;t a feature of Zuno. <span className="text-fg-2">It is the workflow.</span>
         </p>
       </div>
 
@@ -36,7 +35,7 @@ export function Footer() {
             docs
           </a>
         </div>
-        <span>$ npm i -g zuno</span>
+        <span>$ npm i -g @zunocli/cli</span>
       </div>
     </footer>
   );

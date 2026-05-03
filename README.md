@@ -33,12 +33,12 @@ $ zuno
 
 LP management is a real tension between fee density and survival. A monolithic copilot picks one side and tells you to trust it. A debate models the tension explicitly, and the AXL transcript makes the reasoning auditable.
 
-| agent          | does                                                                  |
-| -------------- | --------------------------------------------------------------------- |
-| **Scout**      | reads LP position + pool tick state, classifies the market regime     |
-| **Strategist** | proposes 2-5 candidate ranges; revises after critique                 |
-| **Critic**     | stress-tests every candidate (1×, 2×, 3× vol); vetoes weak ones       |
-| **Arbiter**    | only joins on deadlock; picks final candidate from the full debate    |
+| agent          | does                                                               |
+| -------------- | ------------------------------------------------------------------ |
+| **Scout**      | reads LP position + pool tick state, classifies the market regime  |
+| **Strategist** | proposes 2-5 candidate ranges; revises after critique              |
+| **Critic**     | stress-tests every candidate (1×, 2×, 3× vol); vetoes weak ones    |
+| **Arbiter**    | only joins on deadlock; picks final candidate from the full debate |
 
 The LLM owns reasoning. Numbers come from deterministic helpers: tick math, range checks, allocation, stress simulation, real `eth_gasPrice`, real CoinGecko volatility, fee-yield estimation. The Strategist picks proportions; it can't fabricate raw tick numbers. The Critic's floors come from the user's risk profile (`conservative | balanced | aggressive`).
 
@@ -64,7 +64,7 @@ packages/    workspace libraries  - see packages/README.md
 tooling/     AXL bootstrap + deploy scripts
 ```
 
-- **[`apps/README.md`](./apps/README.md)** - what each app ships (`@zuno/cli`, `@zuno/web`, `@zuno/docs`, `@zuno/proxy`).
+- **[`apps/README.md`](./apps/README.md)** - what each app ships (`@zunocli/cli`, `@zuno/web`, `@zuno/docs`, `@zuno/proxy`).
 - **[`packages/README.md`](./packages/README.md)** - what each package owns (`@zuno/core`, `@zuno/chain`, `@zuno/strategy`, `@zuno/runtime`, `@zuno/execution`, `@zuno/storage`, `@zuno/terminal`) and the dependency graph.
 
 The four agents live under `packages/strategy/src/agents/`:
@@ -82,12 +82,12 @@ orchestrator.ts   in-process debate runner (used as fallback)
 
 Tools are organized by action category. Read actions hit chain or local state; prepare/review actions return structured previews; execute actions return `needs_confirmation` results that the shell holds until the user types `approve it`.
 
-| category    | tools                                                                                                                                                                                                                                |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **read**    | `showAgentWallet`, `showBalances`, `showNetwork`, `showAllowances`, `inspectPosition`, `listPositions`, `listOutOfRangePositions`, `listRiskyPositions`, `showQuote`, `showAlerts`, `showPeers`, `showAgentStatus`, `refreshPools`   |
-| **prepare** | `prepareSwap`, `recommendRebalance`, `showRebalanceOptions`, `createPosition`                                                                                                                                                        |
-| **review**  | `showPlanDiff`, `simulatePlan`, `explainRecommendation`                                                                                                                                                                              |
-| **execute** | `approveToken`, `swapTokens`, `approvePlan`, `applyPlan`, `switchNetwork`, `monitorWallet`                                                                                                                                           |
+| category    | tools                                                                                                                                                                                                                              |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **read**    | `showAgentWallet`, `showBalances`, `showNetwork`, `showAllowances`, `inspectPosition`, `listPositions`, `listOutOfRangePositions`, `listRiskyPositions`, `showQuote`, `showAlerts`, `showPeers`, `showAgentStatus`, `refreshPools` |
+| **prepare** | `prepareSwap`, `recommendRebalance`, `showRebalanceOptions`, `createPosition`                                                                                                                                                      |
+| **review**  | `showPlanDiff`, `simulatePlan`, `explainRecommendation`                                                                                                                                                                            |
+| **execute** | `approveToken`, `swapTokens`, `approvePlan`, `applyPlan`, `switchNetwork`, `monitorWallet`                                                                                                                                         |
 
 ## Run locally
 

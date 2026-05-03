@@ -20,9 +20,8 @@ export function Hero() {
           </h1>
 
           <p className="rise rise-3 mt-8 max-w-[540px] text-[16.5px] leading-[1.65] text-fg-2">
-            Open, rebalance, and monitor Uniswap v4 positions in plain English.
-            Four agents debate every move, you see the reasoning before the
-            wallet signs.
+            Open, rebalance, and monitor Uniswap v4 positions in plain English. Four agents debate
+            every move, you see the reasoning before the wallet signs.
           </p>
 
           <div className="rise rise-4 mt-12 flex flex-wrap items-center gap-5">
@@ -43,7 +42,8 @@ export function Hero() {
 
           <div className="rise rise-5 mt-16 flex flex-wrap items-center gap-x-4 gap-y-2 font-jetbrains text-[11px] text-muted">
             <p className="text-fg-2">
-              <span className="text-pink font-bold">$</span> npm i -g zuno</p>
+              <span className="text-pink font-bold">$</span> npm i -g @zunocli/cli
+            </p>
           </div>
         </div>
 

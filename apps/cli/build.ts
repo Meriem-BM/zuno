@@ -1,15 +1,15 @@
 /**
  * Bundle apps/cli for `npm publish`.
  *
- *   pnpm --filter @zuno/cli build
+ *   pnpm --filter @zunocli/cli build
  *
  * Produces a self-contained ESM bundle at apps/cli/dist/index.js with a
  * Node shebang, executable permissions, and a slim package.json beside it
- * (`name: "zuno"`, `bin: { zuno: "./index.js" }`). Workspace deps are
+ * (`name: "@zunocli/cli"`, `bin: { zuno: "./index.js" }`). Workspace deps are
  * inlined; the bundle has no `@zuno/*` resolvers at install time.
  *
  * To release:
- *   pnpm --filter @zuno/cli build
+ *   pnpm --filter @zunocli/cli build
  *   cd apps/cli/dist
  *   npm publish --access public
  */
@@ -26,7 +26,8 @@ const sourcePkg = JSON.parse(await readFile(join(root, "package.json"), "utf8"))
   description?: string;
 };
 
-const PUBLISHED_NAME = "zuno";
+const PUBLISHED_NAME = "@zunocli/cli";
+const DEVTOOLS_STUB = "zuno:react-devtools-core-stub";
 
 await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
@@ -40,17 +41,33 @@ const result = await esbuild.build({
   platform: "node",
   format: "esm",
   target: "node20",
-  // Keep Turnkey native deps external (they have dynamic requires +
-  // native crypto). Everything else (workspace deps, ink, react, viem)
-  // is inlined so `npm i -g zuno` doesn't pull 50 transitive packages.
-  external: [
-    "@turnkey/sdk-server",
-    "@turnkey/crypto",
-    // ink's optional dev tools - only used when DEV=true at runtime;
-    // not needed for the published CLI.
-    "react-devtools-core",
+  // Keep Turnkey native deps external. Everything else is bundled.
+  external: ["@turnkey/sdk-server", "@turnkey/crypto"],
+  plugins: [
+    {
+      name: "stub-react-devtools",
+      setup(build) {
+        build.onResolve({ filter: /^react-devtools-core$/ }, () => ({
+          path: DEVTOOLS_STUB,
+          namespace: "zuno-stubs",
+        }));
+        build.onLoad(
+          { filter: /^zuno:react-devtools-core-stub$/, namespace: "zuno-stubs" },
+          () => ({
+            contents: "export default { connectToDevTools() {} };",
+            loader: "js",
+          }),
+        );
+      },
+    },
   ],
-  banner: { js: "#!/usr/bin/env node" },
+  banner: {
+    js: [
+      "#!/usr/bin/env node",
+      'import { createRequire as __zunoCreateRequire } from "node:module";',
+      "const require = __zunoCreateRequire(import.meta.url);",
+    ].join("\n"),
+  },
   minify: false,
   sourcemap: false,
   legalComments: "none",

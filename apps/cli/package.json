@@ -1,6 +1,6 @@
 {
-  "name": "@zuno/cli",
-  "version": "0.1.0",
+  "name": "@zunocli/cli",
+  "version": "0.1.2",
   "description": "Terminal-native copilot for Uniswap LPs.",
   "type": "module",
   "bin": {
