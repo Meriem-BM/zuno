@@ -126,6 +126,7 @@ export const RULES: Rule[] = [
       { pattern: /\bbalances?\b.*\b(?:zuno|agent)\s+wallet\b/iu, weight: 115 },
       { pattern: /\bwhat(?:'s| is)\b.*\bin (?:my\s+)?(?:zuno|agent)\s+wallet\b/iu, weight: 90 },
       { pattern: /\bhow much\b.*\b(?:zuno|agent)\s+wallet\b/iu, weight: 85 },
+      { pattern: /^(?:show|view|check)\s+(?:my\s+)?balance$/iu, weight: 95 },
       { pattern: /^(?:my\s+)?balance$/iu, weight: 55 },
     ],
   },
@@ -167,6 +168,7 @@ export const RULES: Rule[] = [
   {
     intent: "list_positions",
     signals: [
+      { pattern: /\binspect\b.*\bpositions\b/iu, weight: 100 },
       { pattern: /\b(?:show|list|view|see|look at|check)\b.*\bpositions?\b/iu, weight: 80 },
       {
         pattern:
@@ -308,11 +310,10 @@ export const RULES: Rule[] = [
     intent: "switch_network",
     signals: [
       {
-        pattern:
-          new RegExp(
-            `\\b(?:switch|change|move|set)\\b.*\\b(?:to\\s+)?(?:network|chain|${NETWORK_PATTERN})\\b`,
-            "iu",
-          ),
+        pattern: new RegExp(
+          `\\b(?:switch|change|move|set)\\b.*\\b(?:to\\s+)?(?:network|chain|${NETWORK_PATTERN})\\b`,
+          "iu",
+        ),
         weight: 100,
       },
       { pattern: new RegExp(`\\b(?:use|on)\\s+(?:${NETWORK_PATTERN})\\b`, "iu"), weight: 80 },
@@ -338,6 +339,23 @@ export const RULES: Rule[] = [
     signals: [
       { pattern: /\b(?:show|get)\b\s+(?:the\s+)?(?:quote|route)\b/iu, weight: 100 },
       { pattern: /\bwhat(?:'s| is)\s+the\s+route\b/iu, weight: 90 },
+    ],
+  },
+  {
+    intent: "approve_permit2_spender",
+    signals: [
+      {
+        pattern: /\b(?:permit2|enable)\s+(?:eth|weth|usdc|usdt|dai|wbtc)\b/iu,
+        weight: 130,
+      },
+      {
+        pattern: /\bapprove\s+permit2\s+(?:eth|weth|usdc|usdt|dai|wbtc)\b/iu,
+        weight: 130,
+      },
+      {
+        pattern: /\b(?:eth|weth|usdc|usdt|dai|wbtc)\b\s+(?:for|to)\s+position\s+manager\b/iu,
+        weight: 120,
+      },
     ],
   },
   {
@@ -408,7 +426,7 @@ export const REQUIRED_FIELDS: Partial<Record<IntentKind, Validator>> = {
     if (haveToken && haveAmount) return null;
     if (haveToken && !haveAmount)
       return `How much ${goal!.capital!.tokenSymbol!.toUpperCase()} do you want to deploy?`;
-    return "Which token and how much do you want to deploy? (e.g. \"0.05 ETH\" or \"1000 USDC\")";
+    return 'Which token and how much do you want to deploy? (e.g. "0.05 ETH" or "1000 USDC")';
   },
 };
 

@@ -7,6 +7,7 @@ import {
   isRiskyPosition,
   listPositions,
   pairName,
+  PositionDetailsReadError,
   rangeStatus,
   tickToPrice,
   type ContractReader,
@@ -25,6 +26,41 @@ describe("position reads", () => {
       ["42", "43"],
     );
     assert.ok(positions.every((position) => position.owner === owner));
+  });
+
+  it("returns empty only when the owner balance is definitively zero", async () => {
+    const positions = await listPositions(owner, { chainId: 1, client: zeroBalanceReader() });
+    assert.deepEqual(positions, []);
+  });
+
+  it("does not report zero positions when discovery is incomplete", async () => {
+    await assert.rejects(
+      () => listPositions(owner, { chainId: 1, client: rateLimitedDiscoveryReader() }),
+      /position discovery incomplete/u,
+    );
+  });
+
+  it("preserves discovered token ids when detail reads are rate-limited", async () => {
+    await assert.rejects(
+      () => listPositions(owner, { chainId: 1, client: rateLimitedDetailsReader() }),
+      (error) =>
+        error instanceof PositionDetailsReadError &&
+        error.tokenIds.length === 1 &&
+        error.tokenIds[0] === "30405" &&
+        error.positions.length === 0,
+    );
+  });
+
+  it("preserves loaded positions alongside rate-limited detail ids", async () => {
+    await assert.rejects(
+      () => listPositions(owner, { chainId: 1, client: partialDetailsReader() }),
+      (error) =>
+        error instanceof PositionDetailsReadError &&
+        error.positions.length === 1 &&
+        error.positions[0]?.id === "30404" &&
+        error.tokenIds.length === 1 &&
+        error.tokenIds[0] === "30405",
+    );
   });
 
   it("rejects non-numeric position ids", async () => {
@@ -88,7 +124,9 @@ function reader(): ContractReader {
       if (args.functionName === "nextTokenId") return 44n;
       if (args.functionName === "ownerOf") {
         const tokenId = args.args?.[0] as bigint;
-        return tokenId === 42n || tokenId === 43n ? owner : "0x0000000000000000000000000000000000000001";
+        return tokenId === 42n || tokenId === 43n
+          ? owner
+          : "0x0000000000000000000000000000000000000001";
       }
       if (args.functionName === "getPoolAndPositionInfo") {
         const tokenId = args.args?.[0] as bigint;
@@ -113,6 +151,76 @@ function reader(): ContractReader {
       if (args.functionName === "decimals") {
         return args.address.toLowerCase() === token0.address ? 18 : 6;
       }
+      throw new Error(`unexpected read ${args.functionName}`);
+    },
+  };
+}
+
+function zeroBalanceReader(): ContractReader {
+  return {
+    async readContract(args) {
+      if (args.functionName === "balanceOf") return 0n;
+      throw new Error(`unexpected read ${args.functionName}`);
+    },
+  };
+}
+
+function rateLimitedDiscoveryReader(): ContractReader {
+  return {
+    async readContract(args) {
+      if (args.functionName === "balanceOf") return 2n;
+      if (args.functionName === "nextTokenId") return 30_406n;
+      if (args.functionName === "ownerOf") throw new Error("rate limited");
+      throw new Error(`unexpected read ${args.functionName}`);
+    },
+  };
+}
+
+function rateLimitedDetailsReader(): ContractReader {
+  return {
+    async readContract(args) {
+      if (args.functionName === "balanceOf") return 1n;
+      if (args.functionName === "nextTokenId") return 30_406n;
+      if (args.functionName === "ownerOf") {
+        const tokenId = args.args?.[0] as bigint;
+        if (tokenId === 30_405n) return owner;
+        return "0x0000000000000000000000000000000000000001";
+      }
+      if (args.functionName === "getPoolAndPositionInfo") throw new Error("rate limited");
+      throw new Error(`unexpected read ${args.functionName}`);
+    },
+  };
+}
+
+function partialDetailsReader(): ContractReader {
+  return {
+    async readContract(args) {
+      if (args.functionName === "balanceOf") return 2n;
+      if (args.functionName === "nextTokenId") return 30_406n;
+      if (args.functionName === "ownerOf") {
+        const tokenId = args.args?.[0] as bigint;
+        if (tokenId === 30_404n || tokenId === 30_405n) return owner;
+        return "0x0000000000000000000000000000000000000001";
+      }
+      if (args.functionName === "getPoolAndPositionInfo") {
+        const tokenId = args.args?.[0] as bigint;
+        if (tokenId === 30_405n) throw new Error("rate limited");
+        return [
+          [token0.address, token1.address, 500, 10, "0x0000000000000000000000000000000000000000"],
+          packPositionInfo(-199_400, -198_400),
+        ];
+      }
+      if (args.functionName === "getPositionLiquidity") return 5_840_291_203_487_120_349n;
+      if (args.functionName === "getSlot0") return [0n, -198_330, 0, 0];
+      if (args.functionName === "getLiquidity") return 12_345_678_901_234_567_890n;
+      if (args.functionName === "getPositionInfo") {
+        return [5_840_291_203_487_120_349n, 9_999n, 9_999n];
+      }
+      if (args.functionName === "getFeeGrowthInside") return [9_999n, 9_999n];
+      if (args.functionName === "symbol")
+        return args.address.toLowerCase() === token0.address ? "WETH" : "USDC";
+      if (args.functionName === "decimals")
+        return args.address.toLowerCase() === token0.address ? 18 : 6;
       throw new Error(`unexpected read ${args.functionName}`);
     },
   };

@@ -1,5 +1,5 @@
 import type { AgentThought, ChainId, FlowStart, Plan } from "@zuno/core";
-import { agentsAvailable, runDebate } from "@zuno/strategy/agents";
+import { agentsAvailable, isRecoverableAgentError, runDebate } from "@zuno/strategy/agents";
 import {
   buildPlanDiff,
   loadRiskContext,
@@ -18,13 +18,6 @@ import {
   resolvePositionId,
   resolveAgentWallet,
 } from "../shared.js";
-
-// Three layers of fallback for recommendRebalance:
-//   1. AXL mesh: all four agent peers visible → real four-process debate.
-//   2. In-process orchestrator: same four agents, single Node process.
-//   3. Deterministic recommendPlan math: no LLM, demo still works.
-// The transcript is attached to the saved plan via risk.reasons so
-// explainRecommendation can replay the debate.
 
 const recommendRebalance: ToolDefinition = {
   name: "recommendRebalance",
@@ -130,7 +123,6 @@ async function produce(
     riskProfile: (process.env.ZUNO_RISK_PROFILE as FlowStart["riskProfile"]) ?? "balanced",
   };
 
-  // Path 1: real AXL mesh.
   const meshPlan = await runMeshFlow<FlowStart>({
     kind: "flow_start",
     payload: start,
@@ -139,13 +131,15 @@ async function produce(
   });
   if (meshPlan) return meshPlan;
 
-  // Path 2: in-process LLM debate.
   if (agentsAvailable()) {
-    const result = await runDebate({ start, onThought: onAgentThought });
-    return attachTranscript(result.plan, result.ready.transcript);
+    try {
+      const result = await runDebate({ start, onThought: onAgentThought });
+      return attachTranscript(result.plan, result.ready.transcript);
+    } catch (error) {
+      if (!isRecoverableAgentError(error)) throw error;
+    }
   }
 
-  // Path 3: deterministic fallback.
   const snapshot = buildSnapshot(await getPosition(positionId, { owner, chainId }));
   const riskContext = await loadRiskContext(snapshot);
   return recommendPlan(snapshot, riskContext);
@@ -200,5 +194,4 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-// Re-exported just to keep an existing public surface that other code reads.
 export { buildPlanDiff };

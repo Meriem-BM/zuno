@@ -1,13 +1,7 @@
-import type {
-  CreateCandidate,
-  CreateContext,
-  CreateProposal,
-  Critique,
-  Pool,
-} from "@zuno/core";
+import type { CreateCandidate, CreateContext, CreateProposal, Critique, Pool } from "@zuno/core";
 import { nearestUsableTick, tickToPrice, ZERO_ADDRESS } from "@zuno/chain/uniswap";
 import { z } from "zod";
-import { allocateForCreate } from "../../planner/planning/inventory.js";
+import { allocateForCreate, allocateForCreateTwoSided } from "../../planner/planning/inventory.js";
 import { runAgent, agentsAvailable } from "../shared/llm.js";
 import { MAX_CENTER_OFFSET_TICKS } from "../shared/lib/constants.js";
 import { formatHours } from "../shared/lib/format.js";
@@ -30,11 +24,8 @@ export interface StrategistCreateInput {
 
 interface CreateShape {
   poolIndex: number;
-  // Width as a multiple of `tickSpacing × 8` (the "canonical narrow" baseline).
   widthMultiplier: number;
-  // Bias: positive shifts range upward (price likely to rise), negative downward.
   centerOffsetTicks: number;
-  // "long-token" pushes the range so capital token sits more in the position.
   exposureBias?: "neutral" | "long-token";
 }
 
@@ -63,10 +54,10 @@ export async function runStrategistCreate({
       round === 0
         ? strategistCreateInitialUserMessage({ context })
         : strategistCreateRevisionUserMessage({
-          context,
-          priorCritique: priorCritique!,
-          priorProposal: priorProposal!,
-        });
+            context,
+            priorCritique: priorCritique!,
+            priorProposal: priorProposal!,
+          });
     const { output } = await runAgent({
       system: STRATEGIST_CREATE_SYSTEM,
       user,
@@ -90,7 +81,6 @@ export async function runStrategistCreate({
 
   const candidates = shapes.flatMap((shape) => buildCreateCandidate(context, shape) ?? []);
 
-  // Narrate per-candidate stress + yield.
   for (let i = 0; i < candidates.length; i++) {
     const c = candidates[i]!;
     const pool = context.surveyedPools[c.poolIndex]!.pool;
@@ -142,26 +132,17 @@ export async function runStrategistCreate({
   return { kind: "create", context, candidates, round, rationale };
 }
 
-function buildCreateCandidate(
-  context: CreateContext,
-  shape: CreateShape,
-): CreateCandidate | null {
+function buildCreateCandidate(context: CreateContext, shape: CreateShape): CreateCandidate | null {
   const surveyed = context.surveyedPools[shape.poolIndex];
   if (!surveyed) return null;
   const pool = surveyed.pool;
   const baseWidth = Math.max(pool.tickSpacing * 8, pool.tickSpacing);
   const widthRaw = Math.round(baseWidth * shape.widthMultiplier);
-  const targetWidth = Math.max(
-    pool.tickSpacing * 2,
-    nearestUsableTick(widthRaw, pool.tickSpacing),
-  );
+  const targetWidth = Math.max(pool.tickSpacing * 2, nearestUsableTick(widthRaw, pool.tickSpacing));
   const center = pool.currentTick + shape.centerOffsetTicks;
   let tickLower = nearestUsableTick(center - targetWidth / 2, pool.tickSpacing);
   let tickUpper = nearestUsableTick(center + targetWidth / 2, pool.tickSpacing);
 
-  // Apply exposure bias for "long-token" goal: shift so the capital token sits
-  // more inside the range. If capital is token0 (e.g. ETH), shift the range
-  // upward so price has room above; vice versa for token1.
   if (shape.exposureBias === "long-token" && context.goal.capital) {
     const capitalIsToken0 = symbolMatches(pool, context.goal.capital.tokenSymbol, "token0");
     const drift = pool.tickSpacing * 4;
@@ -174,19 +155,16 @@ function buildCreateCandidate(
     }
   }
 
-  const capitalToken = capitalSide(pool, context.goal.capital?.tokenSymbol);
-  const capitalAmount = parseAtomic(
-    context.goal.capital?.amount ?? "0",
-    capitalToken === "token0" ? pool.token0.decimals : pool.token1.decimals,
-  );
-
-  const allocation = allocateForCreate({
-    pool,
-    tickLower,
-    tickUpper,
-    capitalAmount,
-    capitalToken,
-  });
+  const allocation = context.goal.capital2
+    ? buildTwoSidedAllocation(pool, tickLower, tickUpper, context.goal)
+    : (() => {
+        const capitalToken = capitalSide(pool, context.goal.capital?.tokenSymbol);
+        const capitalAmount = parseAtomic(
+          context.goal.capital?.amount ?? "0",
+          capitalToken === "token0" ? pool.token0.decimals : pool.token1.decimals,
+        );
+        return allocateForCreate({ pool, tickLower, tickUpper, capitalAmount, capitalToken });
+      })();
 
   const expectedYield24hUsd = estimate24hFeeYield({
     candidate: {
@@ -226,7 +204,44 @@ function rationaleForCreate(context: CreateContext, shape: CreateShape, pool: Po
   return `${pool.token0.symbol}/${pool.token1.symbol} ${(pool.feeTier / 10_000).toFixed(2)}% (${widthLabel}${exposure}) for ${context.goal.riskProfile ?? "balanced"} goal.`;
 }
 
-// ETH and WETH are equivalent for LP purposes on EVM; route through WETH.
+function buildTwoSidedAllocation(
+  pool: Pool,
+  tickLower: number,
+  tickUpper: number,
+  goal: CreateContext["goal"],
+): ReturnType<typeof allocateForCreateTwoSided> {
+  const c1 = goal.capital;
+  const c2 = goal.capital2;
+  const resolve = (
+    capital: { tokenSymbol: string; amount: string } | undefined,
+  ): { side: "token0" | "token1"; amount: bigint } | null => {
+    if (!capital?.tokenSymbol || !capital.amount) return null;
+    if (symbolMatches(pool, capital.tokenSymbol, "token0")) {
+      return { side: "token0", amount: parseAtomic(capital.amount, pool.token0.decimals) };
+    }
+    if (symbolMatches(pool, capital.tokenSymbol, "token1")) {
+      return { side: "token1", amount: parseAtomic(capital.amount, pool.token1.decimals) };
+    }
+    return null;
+  };
+  const r1 = resolve(c1);
+  const r2 = resolve(c2);
+  let amount0Provided = 0n;
+  let amount1Provided = 0n;
+  for (const r of [r1, r2]) {
+    if (!r) continue;
+    if (r.side === "token0") amount0Provided += r.amount;
+    else amount1Provided += r.amount;
+  }
+  return allocateForCreateTwoSided({
+    pool,
+    tickLower,
+    tickUpper,
+    amount0Provided,
+    amount1Provided,
+  });
+}
+
 function capitalSide(pool: Pool, capitalSymbol: string | undefined): "token0" | "token1" {
   if (!capitalSymbol) return "token0";
   if (symbolMatches(pool, capitalSymbol, "token0")) return "token0";
@@ -258,7 +273,6 @@ function deterministicCreateShapes(context: CreateContext, round: number): Creat
   const profile = context.goal.riskProfile ?? "balanced";
   const exposureBias =
     context.goal.exposurePreference === "stay-in-token" ? "long-token" : "neutral";
-  // For round 0 propose one variant per pool (up to 3); in revisions widen.
   const widthByProfile: Record<NonNullable<typeof profile>, number> = {
     conservative: 1.6,
     balanced: 1.0,
@@ -292,11 +306,7 @@ const StrategistCreateSchema = z.object({
   candidates: z
     .array(
       z.object({
-        poolIndex: z
-          .number()
-          .int()
-          .min(0)
-          .describe("Index into surveyedPools (0-based)."),
+        poolIndex: z.number().int().min(0).describe("Index into surveyedPools (0-based)."),
         widthMultiplier: z
           .number()
           .min(0.3)

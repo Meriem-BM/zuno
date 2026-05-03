@@ -28,6 +28,7 @@ export type ToolName =
   | "prepareSwap"
   | "showQuote"
   | "approveToken"
+  | "approvePermit2Spender"
   | "listAgentWalletPositions"
   | "inspectPosition"
   | "inspectAllPositions"
@@ -109,7 +110,6 @@ export interface ExecutionContext {
     checkChain?: boolean;
     checkAllowances?: boolean;
   };
-  // Streaming sink for live agent_thought envelopes from the four-agent debate.
   onAgentThought?: (thought: AgentThought) => void;
 }
 
@@ -169,19 +169,12 @@ export interface RecommendRebalanceData {
   reason: string;
   verdict: string;
   confidence: number;
-  /**
-   * Live debate transcript captured during the flow. Each line is
-   * prefixed with the agent role (e.g. `[scout]`, `[critic]`). The CLI
-   * renders these as bullet rows so the user sees the reasoning that
-   * produced the recommendation.
-   */
   transcript?: string[];
-  // Which agent took the final call: "critic" on convergence, "arbiter" on deadlock.
   decidedBy?: "critic" | "arbiter" | "deterministic";
 }
 
 export interface ApplyPlanData {
-  kind: "plan" | "swap" | "create_position";
+  kind: "plan" | "swap" | "create_position" | "approve";
   planId: string;
   positionId: string;
   agentWalletAddress: Address;
@@ -219,10 +212,14 @@ export interface ApplyPlanData {
   amountOut?: string;
   minimumOut?: string;
   route?: string;
+  tokenSymbol?: string;
+  tokenAmount?: string;
+  spenderLabel?: string;
+  spenderAddress?: Address;
 }
 
 export interface ApprovePlanData {
-  kind: "plan" | "swap";
+  kind: "plan" | "swap" | "approve";
   planId: string;
   positionId: string;
   agentWalletAddress: Address;
@@ -245,6 +242,10 @@ export interface ApprovePlanData {
   signer?: "turnkey";
   transactionHash?: Hex;
   turnkeyActivityId?: string;
+  tokenSymbol?: string;
+  tokenAmount?: string;
+  spenderLabel?: string;
+  spenderAddress?: Address;
 }
 
 export interface CreatePositionPreparedActionSummary {
@@ -265,7 +266,6 @@ export interface CreatePositionPreparedActionSummary {
   priceCurrent: number;
   inRange: boolean;
   rangeStatus: string;
-  // Atomic units the user is depositing on each side.
   amount0: string;
   amount1: string;
   expectedYield24hUsd: number;
@@ -273,12 +273,9 @@ export interface CreatePositionPreparedActionSummary {
   goalSummary: string;
   poolReason?: string;
   riskProfile: "conservative" | "balanced" | "aggressive";
-  /**
-   * Max amounts the user is willing to spend (capital + 1% slippage buffer).
-   * The mint will revert if the actual amounts required exceed these.
-   */
   amount0Max: string;
   amount1Max: string;
+  slippageBps: number;
   notes: string[];
 }
 
@@ -370,7 +367,6 @@ export interface SwapQuoteData {
   feeTier: number;
   price: number;
   route: string;
-  // Minimum out at default 50bps slippage.
   minimumOut: string;
   notes: string[];
   source: "uniswap_trading_api" | "uniswap_v4";

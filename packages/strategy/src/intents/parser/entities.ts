@@ -41,6 +41,17 @@ export function extractEntities(text: string): Entities {
     out.tokenOutSymbol = swapPair[2]!.toLowerCase();
   }
 
+  if (!out.tokenSymbol) {
+    const bareApprove = text.match(
+      /\b(?:approve|authorize|allow)\s+(?:permit2\s+)?(eth|weth|usdc|usdt|dai|wbtc)\b/iu,
+    );
+    if (bareApprove) out.tokenSymbol = bareApprove[1]!.toLowerCase();
+  }
+  if (!out.tokenSymbol) {
+    const permit2Bare = text.match(/\b(?:permit2|enable)\s+(eth|weth|usdc|usdt|dai|wbtc)\b/iu);
+    if (permit2Bare) out.tokenSymbol = permit2Bare[1]!.toLowerCase();
+  }
+
   const network = resolveNetwork(text);
   if (network) out.chainName = network.name.toLowerCase();
 

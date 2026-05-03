@@ -45,7 +45,6 @@ export interface BalanceSnapshot {
 }
 
 export interface FetchBalancesOptions {
-  /** Additional ERC20s to read alongside the per-chain whitelist. */
   extraTokens?: Token[];
   client?: TokenReadClient;
 }
@@ -64,7 +63,6 @@ export interface AllowanceReading {
   chainId: ChainId;
   allowanceWei: string;
   allowance: string;
-  /** True iff the allowance is at least `requiredWei` (when supplied). */
   sufficient?: boolean;
   requiredWei?: string;
 }
@@ -79,6 +77,31 @@ export interface ApprovalRequirement {
   needsApproval: boolean;
 }
 
+export interface Permit2AllowanceReading {
+  token: Token;
+  owner: Address;
+  spender: Address;
+  chainId: ChainId;
+  allowanceWei: string;
+  expiration: number;
+  nonce: number;
+  sufficient?: boolean;
+  expired?: boolean;
+  requiredWei?: string;
+}
+
+export interface Permit2ApprovalRequirement {
+  token: Token;
+  owner: Address;
+  spender: Address;
+  chainId: ChainId;
+  currentAllowanceWei: string;
+  expiration: number;
+  requiredWei: string;
+  needsApproval: boolean;
+  expired: boolean;
+}
+
 export interface ApprovalTransaction {
   chainId: ChainId;
   to: Address;
@@ -89,6 +112,5 @@ export interface ApprovalTransaction {
 
 export interface ReadAllowanceOptions {
   client?: TokenReadClient;
-  /** When provided, the result records sufficiency vs this required amount. */
   requiredWei?: bigint;
 }

@@ -1,10 +1,5 @@
 import type { Address, ChainId, Hex, Token } from "@zuno/core";
-import {
-  concatHex,
-  encodeAbiParameters,
-  encodeFunctionData,
-  toHex,
-} from "viem";
+import { concatHex, encodeAbiParameters, encodeFunctionData, toHex } from "viem";
 import { POSITION_MANAGER_ABI, POSITION_MANAGER_BY_CHAIN } from "./lib/constants.js";
 import { buildPoolKey, liquidityForAmounts } from "../positions/lib/helpers.js";
 import type {
@@ -30,6 +25,7 @@ const ACTIONS = {
   BURN_POSITION: 0x03,
   SETTLE_PAIR: 0x0d,
   TAKE_PAIR: 0x11,
+  SWEEP: 0x14,
 } as const;
 
 const HOOK_DATA = "0x" as Hex;
@@ -45,68 +41,63 @@ export function buildMint(params: MintParams): PreparedTx {
     params.token0.decimals,
     params.token1.decimals,
   );
-  const amount0Max = BigInt(params.amount0Desired || "0");
-  const amount1Max = BigInt(params.amount1Desired || "0");
+  const amount0Max = BigInt(params.amount0Max ?? params.amount0Desired ?? "0");
+  const amount1Max = BigInt(params.amount1Max ?? params.amount1Desired ?? "0");
+  const usesNative = poolKey.currency0 === ZERO_ADDRESS || poolKey.currency1 === ZERO_ADDRESS;
+  const actions = usesNative
+    ? [ACTIONS.MINT_POSITION, ACTIONS.SETTLE_PAIR, ACTIONS.SWEEP]
+    : [ACTIONS.MINT_POSITION, ACTIONS.SETTLE_PAIR];
+  const actionParams = [
+    encodeAbiParameters(
+      [
+        {
+          type: "tuple",
+          components: [
+            { type: "address" },
+            { type: "address" },
+            { type: "uint24" },
+            { type: "int24" },
+            { type: "address" },
+          ],
+        },
+        { type: "int24" },
+        { type: "int24" },
+        { type: "uint256" },
+        { type: "uint128" },
+        { type: "uint128" },
+        { type: "address" },
+        { type: "bytes" },
+      ],
+      [
+        [poolKey.currency0, poolKey.currency1, poolKey.fee, poolKey.tickSpacing, poolKey.hooks],
+        params.tickLower,
+        params.tickUpper,
+        liquidity,
+        amount0Max,
+        amount1Max,
+        params.recipient,
+        HOOK_DATA,
+      ],
+    ),
+    encodeAbiParameters(
+      [{ type: "address" }, { type: "address" }],
+      [poolKey.currency0, poolKey.currency1],
+    ),
+  ];
+  if (usesNative) {
+    actionParams.push(
+      encodeAbiParameters(
+        [{ type: "address" }, { type: "address" }],
+        [ZERO_ADDRESS, params.recipient],
+      ),
+    );
+  }
+  const value = poolKey.currency0 === ZERO_ADDRESS ? amount0Max.toString() : "0";
   return buildModifyLiquiditiesTx({
     chainId: params.chainId,
-    actions: [ACTIONS.MINT_POSITION, ACTIONS.SETTLE_PAIR],
-    params: [
-      encodeAbiParameters(
-        [
-          {
-            type: "tuple",
-            components: [
-              {
-                type: "tuple",
-                components: [
-                  { type: "address" },
-                  { type: "address" },
-                  { type: "uint24" },
-                  { type: "int24" },
-                  { type: "address" },
-                ],
-              },
-              { type: "int24" },
-              { type: "int24" },
-              { type: "uint256" },
-              { type: "uint128" },
-              { type: "uint128" },
-              { type: "address" },
-              { type: "bytes" },
-            ],
-          },
-        ],
-        [[
-          [
-            poolKey.currency0,
-            poolKey.currency1,
-            poolKey.fee,
-            poolKey.tickSpacing,
-            poolKey.hooks,
-          ],
-          params.tickLower,
-          params.tickUpper,
-          liquidity,
-          amount0Max,
-          amount1Max,
-          params.recipient,
-          HOOK_DATA,
-        ]],
-      ),
-      encodeAbiParameters(
-        [
-          {
-            type: "tuple",
-            components: [
-              { type: "address" },
-              { type: "address" },
-            ],
-          },
-        ],
-        [[poolKey.currency0, poolKey.currency1]],
-      ),
-    ],
-    value: poolKey.currency0 === ZERO_ADDRESS ? params.amount0Desired : "0",
+    actions,
+    params: actionParams,
+    value,
     deadline: params.deadline,
     description: `mint ${params.token0.symbol}/${params.token1.symbol} ${(params.fee / 10_000).toFixed(2)}% [${params.tickLower}..${params.tickUpper}]`,
   });
@@ -172,7 +163,15 @@ export function buildDecreaseLiquidity(params: DecreaseLiquidityParams): Prepare
             ],
           },
         ],
-        [[params.tokenId, params.liquidity, BigInt(params.amount0Min || "0"), BigInt(params.amount1Min || "0"), HOOK_DATA]],
+        [
+          [
+            params.tokenId,
+            params.liquidity,
+            BigInt(params.amount0Min || "0"),
+            BigInt(params.amount1Min || "0"),
+            HOOK_DATA,
+          ],
+        ],
       ),
     ],
     value: "0",
@@ -204,11 +203,7 @@ export function buildCollect(params: CollectParams): PreparedTx {
         [
           {
             type: "tuple",
-            components: [
-              { type: "address" },
-              { type: "address" },
-              { type: "address" },
-            ],
+            components: [{ type: "address" }, { type: "address" }, { type: "address" }],
           },
         ],
         [[params.token0, params.token1, params.recipient]],
@@ -284,7 +279,14 @@ export function buildRebalanceCalldata(input: RebalanceCalldataInput): PreparedT
           ],
         },
       ],
-      [[tokenId, BigInt(input.removeAmount0Min || "0"), BigInt(input.removeAmount1Min || "0"), HOOK_DATA]],
+      [
+        [
+          tokenId,
+          BigInt(input.removeAmount0Min || "0"),
+          BigInt(input.removeAmount1Min || "0"),
+          HOOK_DATA,
+        ],
+      ],
     ),
     encodeAbiParameters(
       [
@@ -311,22 +313,18 @@ export function buildRebalanceCalldata(input: RebalanceCalldataInput): PreparedT
           ],
         },
       ],
-      [[
+      [
         [
-          poolKey.currency0,
-          poolKey.currency1,
-          poolKey.fee,
-          poolKey.tickSpacing,
-          poolKey.hooks,
+          [poolKey.currency0, poolKey.currency1, poolKey.fee, poolKey.tickSpacing, poolKey.hooks],
+          input.newTickLower,
+          input.newTickUpper,
+          liquidity,
+          BigInt(input.amount0Desired || "0"),
+          BigInt(input.amount1Desired || "0"),
+          input.recipient,
+          HOOK_DATA,
         ],
-        input.newTickLower,
-        input.newTickUpper,
-        liquidity,
-        BigInt(input.amount0Desired || "0"),
-        BigInt(input.amount1Desired || "0"),
-        input.recipient,
-        HOOK_DATA,
-      ]],
+      ],
     ),
     encodeAbiParameters(
       [{ type: "tuple", components: [{ type: "address" }, { type: "address" }] }],
@@ -373,10 +371,7 @@ function buildModifyLiquiditiesTx(input: {
   const to = positionManagerFor(input.chainId);
   const actionBytes = concatHex(input.actions.map((action) => toHex(action, { size: 1 })));
   const unlockData = encodeAbiParameters(
-    [
-      { type: "bytes" },
-      { type: "bytes[]" },
-    ],
+    [{ type: "bytes" }, { type: "bytes[]" }],
     [actionBytes, input.params],
   );
   const data = encodeFunctionData({

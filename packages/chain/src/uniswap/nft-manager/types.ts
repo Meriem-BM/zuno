@@ -22,6 +22,8 @@ export interface MintParams {
   currentTick: number;
   amount0Desired: string;
   amount1Desired: string;
+  amount0Max?: string;
+  amount1Max?: string;
   amount0Min: string;
   amount1Min: string;
   recipient: Address;

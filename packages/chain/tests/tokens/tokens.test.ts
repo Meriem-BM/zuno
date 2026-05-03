@@ -4,10 +4,12 @@ import type { Address, Token } from "@zuno/core";
 import {
   buildApproveTransaction,
   checkApprovalRequirement,
+  checkPermit2ApprovalRequirement,
   fetchBalances,
   MAX_UINT256,
   lookupToken,
   readAllowance,
+  readPermit2Allowance,
   type TokenReadClient,
 } from "../../src/tokens/index.js";
 
@@ -46,6 +48,21 @@ const allowanceClient = (allowanceWei: bigint): TokenReadClient => ({
   },
   async readContract() {
     return allowanceWei;
+  },
+});
+
+const permit2AllowanceClient = (
+  amount: bigint,
+  expiration = Math.floor(Date.now() / 1000) + 3600,
+): TokenReadClient => ({
+  async getBalance() {
+    return 0n;
+  },
+  async multicall() {
+    return [];
+  },
+  async readContract() {
+    return [amount, expiration, 7] as const;
   },
 });
 
@@ -111,6 +128,33 @@ describe("@zuno/chain/tokens - allowances + approve", () => {
       { client: allowanceClient(1_000_000n) },
     );
     assert.equal(req.needsApproval, true);
+  });
+
+  it("reads Permit2 allowance for a spender", async () => {
+    const reading = await readPermit2Allowance(
+      { token: usdc, owner, spender, chainId: 42161 },
+      { client: permit2AllowanceClient(2_000_000n), requiredWei: 1_000_000n },
+    );
+    assert.equal(reading.allowanceWei, "2000000");
+    assert.equal(reading.sufficient, true);
+    assert.equal(reading.nonce, 7);
+  });
+
+  it("detects missing or expired Permit2 spender approval", async () => {
+    const missing = await checkPermit2ApprovalRequirement(
+      { token: usdc, owner, spender, chainId: 42161 },
+      5_000_000n,
+      { client: permit2AllowanceClient(1_000_000n) },
+    );
+    assert.equal(missing.needsApproval, true);
+
+    const expired = await checkPermit2ApprovalRequirement(
+      { token: usdc, owner, spender, chainId: 42161 },
+      1_000_000n,
+      { client: permit2AllowanceClient(2_000_000n, 1) },
+    );
+    assert.equal(expired.needsApproval, true);
+    assert.equal(expired.expired, true);
   });
 
   it("buildApproveTransaction encodes the approve selector and amount", () => {

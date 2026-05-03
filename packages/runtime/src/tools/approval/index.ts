@@ -8,7 +8,7 @@ import {
 import { checkApproval, tradingApiEnabled } from "@zuno/chain/uniswap/trading-api";
 import { newPreparedActionId } from "@zuno/core";
 import { listPositions } from "@zuno/chain/uniswap";
-import { parseUnits } from "viem";
+import { encodeFunctionData, parseUnits } from "viem";
 import type { Address, ChainId, Token } from "@zuno/core";
 import type {
   ApproveTokenSummary,
@@ -205,6 +205,103 @@ const approveToken: ToolDefinition = {
   },
 };
 
+const PERMIT2_APPROVE_ABI = [
+  {
+    type: "function",
+    name: "approve",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint160" },
+      { name: "expiration", type: "uint48" },
+    ],
+    outputs: [],
+  },
+] as const;
+
+const MAX_UINT160 = (1n << 160n) - 1n;
+const MAX_UINT48 = (1n << 48n) - 1n;
+
+const approvePermit2Spender: ToolDefinition = {
+  name: "approvePermit2Spender",
+  intents: ["approve_permit2_spender"],
+  execute: async (intent, ctx) => {
+    const target = resolveAgentWallet(ctx);
+    if (!target) return missingAgentWallet("approvePermit2Spender");
+
+    const symbol = intent.tokenSymbol;
+    if (!symbol) {
+      return err(
+        "approvePermit2Spender",
+        "TOKEN_UNKNOWN",
+        'Which token? Try "approve permit2 USDC".',
+      );
+    }
+    const token = lookupToken(symbol, target.chainId);
+    if (!token) {
+      return err(
+        "approvePermit2Spender",
+        "TOKEN_UNKNOWN",
+        `${symbol.toUpperCase()} is not a known token on ${chainName(target.chainId)}.`,
+      );
+    }
+
+    const cfg = chainConfig(target.chainId);
+    const permit2 = cfg.permit2;
+    const posManager = cfg.positionManager;
+    const data = encodeFunctionData({
+      abi: PERMIT2_APPROVE_ABI,
+      functionName: "approve",
+      args: [token.address, posManager, MAX_UINT160, Number(MAX_UINT48)],
+    });
+
+    const summary: ApproveTokenSummary = {
+      tokenSymbol: token.symbol,
+      tokenAddress: token.address,
+      spenderLabel: "Uniswap v4 PositionManager (via Permit2)",
+      spenderAddress: posManager,
+      amount: "unlimited",
+      chainId: target.chainId,
+      chainName: chainName(target.chainId),
+    };
+
+    const id = newPreparedActionId();
+    const now = Date.now();
+    const expiresAt = now + APPROVE_EXPIRY_MS;
+    const transactions = [
+      {
+        chainId: target.chainId,
+        from: target.address,
+        to: permit2,
+        data,
+        value: "0",
+        description: `permit2.approve(${token.symbol}, posManager, max, max)`,
+      },
+    ];
+    await preparedActionStore(ctx).save({
+      id,
+      kind: "approve",
+      summary,
+      transactions,
+      state: "pending_review",
+      createdAt: now,
+      expiresAt,
+      ownerAddress: target.address,
+      chainId: target.chainId,
+    });
+    const responseData: NeedsConfirmationData<ApproveTokenSummary> = {
+      preparedAction: { id, kind: "approve", summary, transactions, expiresAt },
+      prompt: `Grant Permit2 the right to spend your ${token.symbol} via the v4 PositionManager? Type "approve it" to confirm.`,
+    };
+    return needsConfirmation<ApproveTokenSummary>(
+      "approvePermit2Spender",
+      `Prepared Permit2 approval of ${token.symbol} for the v4 PositionManager.`,
+      responseData,
+    );
+  },
+};
+
 function uniqueTokens(tokens: Token[]): Token[] {
   const seen = new Set<string>();
   const out: Token[] = [];
@@ -217,4 +314,8 @@ function uniqueTokens(tokens: Token[]): Token[] {
   return out;
 }
 
-export const APPROVAL_TOOLS: readonly ToolDefinition[] = [showAllowances, approveToken];
+export const APPROVAL_TOOLS: readonly ToolDefinition[] = [
+  showAllowances,
+  approveToken,
+  approvePermit2Spender,
+];

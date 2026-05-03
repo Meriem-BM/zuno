@@ -19,10 +19,20 @@ export function Footer() {
           <span>zuno · uniswap v4</span>
         </div>
         <div className="flex gap-6">
-          <a href="https://github.com/Meriem-BM/zuno" className="link-sweep transition hover:text-fg">
+          <a
+            href="https://github.com/Meriem-BM/zuno"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="link-sweep transition hover:text-fg"
+          >
             github
           </a>
-          <a href="/docs" className="link-sweep transition hover:text-fg">
+          <a
+            href="https://zuno-fb55ec99.mintlify.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="link-sweep transition hover:text-fg"
+          >
             docs
           </a>
         </div>

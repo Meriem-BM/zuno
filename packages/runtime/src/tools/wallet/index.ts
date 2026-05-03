@@ -1,6 +1,12 @@
 import { chainName, defaultChainId } from "@zuno/chain/config";
 import type { AgentWallet } from "@zuno/chain/wallet";
-import { buildMint, listPositions, liquidityForAmounts, pairName } from "@zuno/chain/uniswap";
+import {
+  buildMint,
+  listPositions,
+  liquidityForAmounts,
+  pairName,
+  PositionDetailsReadError,
+} from "@zuno/chain/uniswap";
 import type { AgentThought, ChainId, CreateStart, Plan } from "@zuno/core";
 import { newPreparedActionId } from "@zuno/core";
 import { agentsAvailable, runDebateCreate } from "@zuno/strategy/agents";
@@ -22,6 +28,8 @@ import {
   resolveAgentWallet,
   walletService,
 } from "../shared.js";
+
+const CREATE_MINT_SLIPPAGE_BPS = 500;
 
 const createAgentWallet: ToolDefinition = {
   name: "createAgentWallet",
@@ -139,7 +147,14 @@ const createPosition: ToolDefinition = {
       return err(
         "createPosition",
         "INTENT_NOT_ACTIONABLE",
-        'Tell me which token and how much you want to deploy, e.g. "0.05 ETH" or "1000 USDC".',
+        'Tell me which token and how much you want to deploy, e.g. "0.05 ETH" or "0.05 ETH and 100 USDC".',
+      );
+    }
+    if (goal.capital2 && (!goal.capital2.tokenSymbol || !goal.capital2.amount)) {
+      return err(
+        "createPosition",
+        "INTENT_NOT_ACTIONABLE",
+        'Second capital is partial - give both amount and token, e.g. "0.05 ETH and 100 USDC".',
       );
     }
     const start: CreateStart = {
@@ -174,7 +189,6 @@ const createPosition: ToolDefinition = {
         ],
         expiresAt: Date.now() + 5 * 60 * 1000,
       };
-      // Persist for `apply it` follow-up.
       try {
         await preparedActionStore(ctx).save({
           ...preparedAction,
@@ -185,7 +199,7 @@ const createPosition: ToolDefinition = {
           notes: summary.notes,
         });
       } catch {
-        // prepared-action store optional in tests
+        // Optional in tests.
       }
       const mintAmounts = describeMintAmounts(summary);
       const data: NeedsConfirmationData<CreatePositionPreparedActionSummary> = {
@@ -203,9 +217,6 @@ const createPosition: ToolDefinition = {
   },
 };
 
-// AXL first, then in-process orchestrator. No deterministic fallback for
-// create: without a goal-driven proposal there's nothing meaningful to
-// emit, so we surface a clear error instead.
 async function produceCreate(
   start: CreateStart,
   chainId: ChainId,
@@ -227,11 +238,14 @@ async function produceCreate(
   );
 }
 
-// Strategist's expectedYield24hUsd is pool-level; scale by userL/(userL+poolL)
-// so the user-facing number corresponds to the actual deposit, not the pool.
 function scaleYieldToUserShare(
   plan: Plan,
-  pool: { liquidity: string; currentTick: number; token0: { decimals: number }; token1: { decimals: number } },
+  pool: {
+    liquidity: string;
+    currentTick: number;
+    token0: { decimals: number };
+    token1: { decimals: number };
+  },
 ): number {
   const poolYieldUsd = plan.recommended.expectedYield24hUsd ?? 0;
   if (poolYieldUsd <= 0) return 0;
@@ -275,14 +289,10 @@ function buildCreateSummary(
   riskProfile: "conservative" | "balanced" | "aggressive",
 ): CreatePositionPreparedActionSummary {
   const pool = plan.snapshot.position.pool;
-  // Slippage buffer: cap at deposit + 1% so the chain reverts if real
-  // amounts come back materially higher (e.g. tick rounding plus drift).
-  const amount0Max = withSlippage(plan.recommended.deploy0, 100);
-  const amount1Max = withSlippage(plan.recommended.deploy1, 100);
+  const amount0Max = withSlippage(plan.recommended.deploy0, CREATE_MINT_SLIPPAGE_BPS);
+  const amount1Max = withSlippage(plan.recommended.deploy1, CREATE_MINT_SLIPPAGE_BPS);
   const goalSummary = plan.risk.reasons[0] ?? "agent debate concluded";
-  const decidedBy = plan.risk.reasons.some((r) => r.startsWith("[arbiter]"))
-    ? "arbiter"
-    : "critic";
+  const decidedBy = plan.risk.reasons.some((r) => r.startsWith("[arbiter]")) ? "arbiter" : "critic";
   const priceCurrent = plan.snapshot.range.priceCurrent;
   const inRange =
     priceCurrent >= plan.recommended.priceLower && priceCurrent <= plan.recommended.priceUpper;
@@ -319,6 +329,7 @@ function buildCreateSummary(
     riskProfile,
     amount0Max,
     amount1Max,
+    slippageBps: CREATE_MINT_SLIPPAGE_BPS,
     notes: [`debate decided by ${decidedBy}`],
   };
 }
@@ -335,6 +346,8 @@ function buildMintFromPlan(plan: Plan, recipient: `0x${string}`, chainId: ChainI
     currentTick: pool.currentTick,
     amount0Desired: plan.recommended.deploy0,
     amount1Desired: plan.recommended.deploy1,
+    amount0Max: withSlippage(plan.recommended.deploy0, CREATE_MINT_SLIPPAGE_BPS),
+    amount1Max: withSlippage(plan.recommended.deploy1, CREATE_MINT_SLIPPAGE_BPS),
     amount0Min: "0",
     amount1Min: "0",
     recipient,
@@ -374,6 +387,26 @@ const listAgentWalletPositions: ToolDefinition = {
         },
       );
     } catch (error) {
+      if (error instanceof PositionDetailsReadError) {
+        const loadedPositions = error.positions.map((position) => ({
+          positionId: position.id,
+          pair: pairName(position),
+          feeTier: position.pool.feeTier,
+        }));
+        const unavailablePositions = error.tokenIds.map((positionId) => ({
+          positionId,
+          pair: "details unavailable (RPC rate-limited)",
+        }));
+        return ok(
+          "listAgentWalletPositions",
+          `Found ${loadedPositions.length + unavailablePositions.length} position id${loadedPositions.length + unavailablePositions.length === 1 ? "" : "s"} in the Zuno wallet on ${chainName(target.chainId)}, but RPC rate limits blocked ${unavailablePositions.length} detail read${unavailablePositions.length === 1 ? "" : "s"}.`,
+          {
+            agentWalletAddress: target.address,
+            chainId: target.chainId,
+            positions: [...loadedPositions, ...unavailablePositions],
+          },
+        );
+      }
       return err("listAgentWalletPositions", "CHAIN_READ_FAILED", errorMessage(error));
     }
   },

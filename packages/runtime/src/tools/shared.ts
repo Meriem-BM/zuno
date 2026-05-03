@@ -25,7 +25,9 @@ export function resolvePositionId(
   intent: { positionId?: string },
   ctx: ExecutionContext,
 ): string | undefined {
-  return intent.positionId ?? ctx.session.lastPositionId ?? undefined;
+  if (isPositionTokenId(intent.positionId)) return intent.positionId;
+  if (isPositionTokenId(ctx.session.lastPositionId)) return ctx.session.lastPositionId;
+  return undefined;
 }
 
 export function resolvePlanId(
@@ -86,6 +88,10 @@ export function alertStore(ctx: ExecutionContext) {
 export function preparedActionStore(ctx: ExecutionContext) {
   if (!ctx.preparedActionStore) throw new Error("prepared action store not configured");
   return ctx.preparedActionStore;
+}
+
+function isPositionTokenId(value: string | null | undefined): value is string {
+  return typeof value === "string" && /^\d+$/u.test(value);
 }
 
 export function needsConfirmation<TSummary, TData = NeedsConfirmationData<TSummary>>(

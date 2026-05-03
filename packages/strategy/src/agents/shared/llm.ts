@@ -2,9 +2,6 @@ import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import type { z } from "zod";
 
-// Every agent uses structured outputs (zod schema → typed JSON), never
-// free-form text. Keeps the CLI rendering deterministic.
-
 let cachedClient: OpenAI | null = null;
 
 export function getOpenAi(): OpenAI | null {
@@ -20,15 +17,20 @@ export interface AgentRunOptions<S extends z.ZodTypeAny> {
   user: string;
   schema: S;
   schemaName: string;
-  // Default gpt-4o-mini. Override per-agent if needed.
   model?: string;
-  // Default 0.4 for proposal/revision; 0.0 for critic/arbiter.
   temperature?: number;
 }
 
 export interface AgentRunResult<T> {
   output: T;
   id: string;
+}
+
+export class AgentResponseError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "AgentResponseError";
+  }
 }
 
 export async function runAgent<S extends z.ZodTypeAny>(
@@ -44,7 +46,6 @@ export async function runAgent<S extends z.ZodTypeAny>(
   const model = opts.model ?? process.env.ZUNO_AGENT_MODEL ?? "gpt-4o-mini";
   const temperature = opts.temperature ?? 0.4;
 
-  // Schemas render under 2KB; 4000 is plenty and bounds runaway generation.
   const MAX_TOKENS = 4000;
 
   const attempt = async (attemptTemperature: number) =>
@@ -59,14 +60,22 @@ export async function runAgent<S extends z.ZodTypeAny>(
       response_format: zodResponseFormat(opts.schema, opts.schemaName),
     });
 
-  // gpt-4o-mini occasionally hits the output cap on first try; retry once
-  // at temperature 0 to nudge it toward a more compact response.
   let completion;
   try {
     completion = await attempt(temperature);
   } catch (e) {
     if (isLengthError(e)) {
-      completion = await attempt(0);
+      try {
+        completion = await attempt(0);
+      } catch (retryError) {
+        if (isLengthError(retryError)) {
+          throw new AgentResponseError(
+            `Agent ${opts.schemaName} exceeded the model output length limit.`,
+            { cause: retryError },
+          );
+        }
+        throw retryError;
+      }
     } else {
       throw e;
     }
@@ -75,6 +84,11 @@ export async function runAgent<S extends z.ZodTypeAny>(
   const choice = completion.choices[0];
   if (!choice?.message.parsed) {
     const reason = choice?.finish_reason ?? "unknown";
+    if (reason === "length") {
+      throw new AgentResponseError(
+        `Agent ${opts.schemaName} exceeded the model output length limit.`,
+      );
+    }
     throw new Error(
       `Agent ${opts.schemaName} returned no parsed output (model=${model}, finish=${reason}).`,
     );
@@ -88,6 +102,11 @@ function isLengthError(e: unknown): boolean {
     if (e.message.toLowerCase().includes("length limit")) return true;
   }
   return false;
+}
+
+export function isRecoverableAgentError(error: unknown): boolean {
+  if (error instanceof AgentResponseError) return true;
+  return isLengthError(error);
 }
 
 export function agentsAvailable(): boolean {

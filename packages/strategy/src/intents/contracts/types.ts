@@ -16,6 +16,7 @@ export type IntentKind =
   | "prepare_swap"
   | "show_quote"
   | "approve_token"
+  | "approve_permit2_spender"
   | "list_positions"
   | "inspect_position"
   | "inspect_all_positions"
@@ -45,7 +46,6 @@ export interface PendingClarification {
   field: ClarificationField;
   positionId?: string;
   planId?: string;
-  // Partial Goal accumulated across clarification turns.
   createGoal?: Partial<CreateGoal>;
 }
 
@@ -67,7 +67,6 @@ export interface Intent extends Entities {
   pendingIntent?: IntentKind;
   pendingField?: ClarificationField;
   corrections?: string[];
-  // Filled when intent is "create_position" and Goal extraction succeeded.
   createGoal?: Partial<CreateGoal>;
 }
 

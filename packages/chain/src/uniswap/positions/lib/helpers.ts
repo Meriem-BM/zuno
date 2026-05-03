@@ -1,12 +1,7 @@
 import { chainConfig, viemChainFor } from "@zuno/chain/config";
 import type { Address, ChainId, Hex, Token } from "@zuno/core";
-import {
-  createPublicClient,
-  encodeAbiParameters,
-  formatUnits,
-  http,
-  keccak256,
-} from "viem";
+import { createPublicClient, encodeAbiParameters, http, keccak256 } from "viem";
+import { TOKEN_WHITELIST } from "../../../tokens/constants.js";
 import { ERC20_ABI, ZERO_ADDRESS } from "./constants.js";
 import type { ContractReader } from "../types.js";
 
@@ -45,11 +40,22 @@ export async function readToken(
     };
   }
 
-  const [symbol, decimals] = await Promise.all([
-    client.readContract({ address, abi: ERC20_ABI, functionName: "symbol" }),
-    client.readContract({ address, abi: ERC20_ABI, functionName: "decimals" }),
-  ]);
-  return { address, symbol: String(symbol), decimals: Number(decimals) };
+  const known = chainId
+    ? TOKEN_WHITELIST[chainId]?.find(
+        (token) => token.address.toLowerCase() === address.toLowerCase(),
+      )
+    : undefined;
+  if (known) return known;
+
+  try {
+    const [symbol, decimals] = await Promise.all([
+      client.readContract({ address, abi: ERC20_ABI, functionName: "symbol" }),
+      client.readContract({ address, abi: ERC20_ABI, functionName: "decimals" }),
+    ]);
+    return { address, symbol: String(symbol), decimals: Number(decimals) };
+  } catch {
+    return { address, symbol: `${address.slice(0, 6)}...${address.slice(-4)}`, decimals: 18 };
+  }
 }
 
 export function tickSpacingForFee(fee: number): number {
@@ -93,15 +99,15 @@ export function liquidityForAmounts(
   currentTick: number,
   tickLower: number,
   tickUpper: number,
-  decimals0: number,
-  decimals1: number,
+  _decimals0: number,
+  _decimals1: number,
 ): bigint {
   const raw0 = safeBigInt(amount0);
   const raw1 = safeBigInt(amount1);
   if (raw0 <= 0n && raw1 <= 0n) return 0n;
 
-  const value0 = Number(formatUnits(raw0, decimals0));
-  const value1 = Number(formatUnits(raw1, decimals1));
+  const value0 = Number(raw0);
+  const value1 = Number(raw1);
   if (!Number.isFinite(value0) || !Number.isFinite(value1)) return 0n;
 
   const sqrtLower = Math.sqrt(Math.pow(1.0001, tickLower));
@@ -123,7 +129,11 @@ export function liquidityForAmounts(
   return BigInt(Math.floor(liquidity));
 }
 
-export function buildPoolKey(token0: Address, token1: Address, fee: number): {
+export function buildPoolKey(
+  token0: Address,
+  token1: Address,
+  fee: number,
+): {
   poolKey: PoolKey;
   zeroForOne: boolean;
 } {
@@ -151,13 +161,7 @@ export function poolIdFor(poolKey: PoolKey): Hex {
         { type: "int24" },
         { type: "address" },
       ],
-      [
-        poolKey.currency0,
-        poolKey.currency1,
-        poolKey.fee,
-        poolKey.tickSpacing,
-        poolKey.hooks,
-      ],
+      [poolKey.currency0, poolKey.currency1, poolKey.fee, poolKey.tickSpacing, poolKey.hooks],
     ),
   );
 }

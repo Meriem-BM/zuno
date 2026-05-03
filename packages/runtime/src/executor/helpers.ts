@@ -16,7 +16,7 @@ export function applySessionUpdate(
 ): SessionState {
   const patch: Partial<SessionState> = { lastIntent: intent.intent };
 
-  if (intent.positionId) patch.lastPositionId = intent.positionId;
+  if (isPositionTokenId(intent.positionId)) patch.lastPositionId = intent.positionId;
   if (intent.planId) patch.lastPlanId = intent.planId;
 
   if (
@@ -36,9 +36,7 @@ export function applySessionUpdate(
   }
 
   if (hasPreparedAction(result.data)) {
-    if (result.data.preparedAction.kind !== "approve") {
-      patch.lastActionId = result.data.preparedAction.id;
-    }
+    patch.lastActionId = result.data.preparedAction.id;
   }
 
   if (result.tool === "simulatePlan") {
@@ -47,7 +45,7 @@ export function applySessionUpdate(
 
   if (result.tool === "approvePlan" && isApprovePlanData(result.data)) {
     patch.lastPlanId = result.data.planId;
-    patch.lastPositionId = result.data.positionId;
+    if (isPositionTokenId(result.data.positionId)) patch.lastPositionId = result.data.positionId;
     patch.agentWalletAddress = result.data.agentWalletAddress;
     patch.approvalState = result.data.approvalState;
     patch.executionState = result.data.executionState;
@@ -55,7 +53,7 @@ export function applySessionUpdate(
 
   if (result.tool === "applyPlan" && isApplyPlanData(result.data)) {
     patch.lastPlanId = result.data.planId;
-    patch.lastPositionId = result.data.positionId;
+    if (isPositionTokenId(result.data.positionId)) patch.lastPositionId = result.data.positionId;
     patch.agentWalletAddress = result.data.agentWalletAddress;
     patch.approvalState = result.data.approvalState;
     patch.executionState = result.data.executionState;
@@ -109,4 +107,8 @@ function hasPreparedAction(
     "preparedAction" in data &&
     typeof (data as { preparedAction?: { id?: unknown } }).preparedAction?.id === "string"
   );
+}
+
+function isPositionTokenId(value: string | null | undefined): value is string {
+  return typeof value === "string" && /^\d+$/u.test(value);
 }

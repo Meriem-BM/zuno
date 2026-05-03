@@ -12,10 +12,15 @@ const showBalances: ToolDefinition = {
     const target = resolveAgentWallet(ctx);
     if (!target) return missingAgentWallet("showBalances");
     try {
-      const positions = await listPositions(target.address, { chainId: target.chainId });
       const extras: Token[] = [];
-      for (const p of positions) {
-        extras.push(p.pool.token0, p.pool.token1);
+      let skippedPositionTokens = false;
+      try {
+        const positions = await listPositions(target.address, { chainId: target.chainId });
+        for (const p of positions) {
+          extras.push(p.pool.token0, p.pool.token1);
+        }
+      } catch {
+        skippedPositionTokens = true;
       }
       const snap = await fetchBalances(target.address, target.chainId, { extraTokens: extras });
       const data: ShowBalancesData = {
@@ -32,7 +37,9 @@ const showBalances: ToolDefinition = {
       };
       return ok(
         "showBalances",
-        `${snap.tokens.length + 1} balances on ${chainName(target.chainId)}.`,
+        skippedPositionTokens
+          ? `${snap.tokens.length + 1} balances on ${chainName(target.chainId)}. Skipped LP-position token discovery because the RPC rate-limited that scan.`
+          : `${snap.tokens.length + 1} balances on ${chainName(target.chainId)}.`,
         data,
       );
     } catch (error) {

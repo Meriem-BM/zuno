@@ -48,8 +48,6 @@ function formatAtomic(amount: string | undefined, decimals = 18, symbol = ""): s
   }
 }
 
-// The yield formula is mainnet-calibrated; testnet liquidity scales make it
-// produce ~0 or millions. Returns null to hide the row in those cases.
 const PLAUSIBLE_YIELD_MAX_USD_24H = 100_000;
 function formatYield(yieldUsd: number): string | null {
   if (!Number.isFinite(yieldUsd) || yieldUsd <= 0) return null;
@@ -287,19 +285,29 @@ export function formatResultData(result: ToolExecutionResult): Field[] {
       if (d.kind === "create_position") {
         return [
           { key: "action", value: d.planId },
-          { key: "minted", value: `${d.pair} ${(d.feeTier / 10_000).toFixed(2)}%  range ${d.newRange.priceLower.toFixed(4)}–${d.newRange.priceUpper.toFixed(4)}` },
+          {
+            key: "minted",
+            value: `${d.pair} ${(d.feeTier / 10_000).toFixed(2)}%  range ${d.newRange.priceLower.toFixed(4)}–${d.newRange.priceUpper.toFixed(4)}`,
+          },
           { key: "approval", value: d.approvalState },
           { key: "execution", value: d.executionState },
           { key: "status", value: d.status },
           ...(d.transactionHash ? [{ key: "tx", value: shortHash(d.transactionHash) }] : []),
           ...(d.turnkeyActivityId ? [{ key: "turnkey", value: d.turnkeyActivityId }] : []),
-          { key: "·", value: "tokenId visible after `inspect my positions` (one block confirmation)" },
+          {
+            key: "·",
+            value: "tokenId visible after `inspect my positions` (one block confirmation)",
+          },
         ];
       }
       if (d.kind === "swap") {
         return [
           { key: "action", value: d.planId },
-          { key: "swap", value: `${d.amountIn ?? "0"} ${d.tokenIn?.symbol ?? ""} → ${d.amountOut ?? "0"} ${d.tokenOut?.symbol ?? ""}`.trim() },
+          {
+            key: "swap",
+            value:
+              `${d.amountIn ?? "0"} ${d.tokenIn?.symbol ?? ""} → ${d.amountOut ?? "0"} ${d.tokenOut?.symbol ?? ""}`.trim(),
+          },
           { key: "route", value: d.route ?? "trading api" },
           { key: "approval", value: d.approvalState },
           { key: "execution", value: d.executionState },
@@ -330,8 +338,22 @@ export function formatResultData(result: ToolExecutionResult): Field[] {
       if (d.kind === "swap") {
         return [
           { key: "action", value: d.planId },
-          { key: "swap", value: `${d.amountIn ?? "0"} ${d.tokenIn?.symbol ?? ""} → ${d.amountOut ?? "0"} ${d.tokenOut?.symbol ?? ""}`.trim() },
+          {
+            key: "swap",
+            value:
+              `${d.amountIn ?? "0"} ${d.tokenIn?.symbol ?? ""} → ${d.amountOut ?? "0"} ${d.tokenOut?.symbol ?? ""}`.trim(),
+          },
           { key: "route", value: d.route ?? "trading api" },
+          { key: "approval", value: d.approvalState },
+          { key: "execution", value: d.executionState },
+        ];
+      }
+      if (d.kind === "approve") {
+        return [
+          { key: "action", value: d.planId },
+          { key: "token", value: d.tokenSymbol ?? "" },
+          { key: "amount", value: d.tokenAmount ?? "unlimited" },
+          { key: "spender", value: d.spenderLabel ?? "" },
           { key: "approval", value: d.approvalState },
           { key: "execution", value: d.executionState },
         ];
@@ -470,7 +492,10 @@ export function formatResultData(result: ToolExecutionResult): Field[] {
       const d = data as NeedsConfirmationData<SwapPreparedActionSummary>;
       const summary = d.preparedAction.summary;
       return [
-        { key: "swap", value: `${summary.amountIn} ${summary.tokenIn.symbol} → ${summary.amountOut} ${summary.tokenOut.symbol}` },
+        {
+          key: "swap",
+          value: `${summary.amountIn} ${summary.tokenIn.symbol} → ${summary.amountOut} ${summary.tokenOut.symbol}`,
+        },
         { key: "route", value: summary.route },
         { key: "min", value: summary.minimumOut },
         { key: "chain", value: summary.chainName },
@@ -505,7 +530,7 @@ export function formatResultData(result: ToolExecutionResult): Field[] {
         },
         {
           key: "slippage",
-          value: `+1% cap (≤${formatAtomic(s.amount0Max, s.pool.token0.decimals, s.pool.token0.symbol)} / ≤${formatAtomic(s.amount1Max, s.pool.token1.decimals, s.pool.token1.symbol)})`,
+          value: `+${((s.slippageBps ?? 100) / 100).toFixed(2)}% cap (≤${formatAtomic(s.amount0Max, s.pool.token0.decimals, s.pool.token0.symbol)} / ≤${formatAtomic(s.amount1Max, s.pool.token1.decimals, s.pool.token1.symbol)})`,
         },
       );
       if (s.prepAction) fields.push({ key: "prep", value: s.prepAction });

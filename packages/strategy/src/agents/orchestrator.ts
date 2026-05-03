@@ -14,6 +14,7 @@ import type {
   PositionSnapshot,
   RebalanceProposal,
   RiskNote,
+  RiskProfile,
 } from "@zuno/core";
 import { newPlanId } from "@zuno/core";
 import { ZERO_ADDRESS } from "@zuno/chain/uniswap";
@@ -21,17 +22,26 @@ import { runScout, runScoutCreate } from "./scout/handler.js";
 import { runStrategist, runStrategistCreate } from "./strategist/handler.js";
 import { runCritic, runCriticCreate } from "./critic/handler.js";
 import { runArbiter, runArbiterCreate } from "./arbiter/handler.js";
+import { BUFFER_FLOOR_HOURS } from "./shared/lib/constants.js";
 import type { ThoughtChannel, ThoughtSink } from "./shared/transcript.js";
 
-// Same four handlers, single Node process. Used as the CLI fallback when
-// AXL nodes aren't visible, and by tests where spawning four real
-// processes is overkill. Thoughts go through one accumulating channel
-// instead of envelopes; everything else matches the AXL path.
+function hasValidAccept(critique: Critique, candidateCount: number): boolean {
+  return critique.judgments.some(
+    (j) => j.verdict === "accept" && j.index >= 0 && j.index < candidateCount,
+  );
+}
+
+function criticAcceptedSummary(buffer: number, riskProfile: RiskProfile): string {
+  const floor = BUFFER_FLOOR_HOURS[riskProfile];
+  const buf = buffer.toFixed(0);
+  return buffer >= floor
+    ? `Cleared the ${riskProfile} stress floor with a ${buf}h volatility buffer (Critic accepted).`
+    : `Accepted under ${riskProfile} profile with a ${buf}h volatility buffer (below the ${floor}h ideal — Critic accepted).`;
+}
+
 export interface OrchestratorOptions {
   start: FlowStart;
-  // Streams thoughts as they happen - wire to CLI for live transcript.
   onThought?: ThoughtSink;
-  // Max strategist↔critic rounds before invoking arbiter.
   maxRounds?: number;
 }
 
@@ -75,12 +85,11 @@ export async function runDebate({
     });
     history.push({ proposal, critique });
 
-    if (critique.decision === "accept") {
-      return convergedResult({ context, proposal, critique, transcript });
+    if (critique.decision === "accept" && hasValidAccept(critique, proposal.candidates.length)) {
+      return convergedResult({ context, proposal, critique, transcript, riskProfile });
     }
   }
 
-  // Deadlock - arbiter decides.
   const arbiterChannel = roleChannel("arbiter", accumulator);
   const decision = await runArbiter({
     history,
@@ -99,9 +108,16 @@ interface ConvergeInput {
   proposal: RebalanceProposal;
   critique: Critique;
   transcript: AgentThought[];
+  riskProfile: RiskProfile;
 }
 
-function convergedResult({ context, proposal, critique, transcript }: ConvergeInput): OrchestratorResult {
+function convergedResult({
+  context,
+  proposal,
+  critique,
+  transcript,
+  riskProfile,
+}: ConvergeInput): OrchestratorResult {
   const accepted = critique.judgments.find((j) => j.verdict === "accept")!;
   const recommended = proposal.candidates[accepted.index]!;
   const rejected = proposal.candidates.find((_, i) => i !== accepted.index);
@@ -123,8 +139,9 @@ function convergedResult({ context, proposal, critique, transcript }: ConvergeIn
       verdict,
       confidence,
       reasons: [
-        critique.rationale,
+        criticAcceptedSummary(buffer, riskProfile),
         accepted.reason,
+        critique.rationale,
         `regime ${context.regime} · vol ${context.realizedVolBps}bps · gas ${context.gasGwei.toFixed(2)}gwei`,
       ],
     },
@@ -132,10 +149,7 @@ function convergedResult({ context, proposal, critique, transcript }: ConvergeIn
   return { plan, ready: { plan, decidedBy: "critic", transcript: [...transcript] } };
 }
 
-function roleChannel(
-  role: Exclude<AgentRole, "cli">,
-  accumulator: ThoughtSink,
-): ThoughtChannel {
+function roleChannel(role: Exclude<AgentRole, "cli">, accumulator: ThoughtSink): ThoughtChannel {
   const local: AgentThought[] = [];
   return {
     async emit(thought) {
@@ -146,8 +160,6 @@ function roleChannel(
     history: () => [...local],
   };
 }
-
-// === ORCHESTRATOR - CREATE ===
 
 export interface CreateOrchestratorOptions {
   start: CreateStart;
@@ -192,12 +204,11 @@ export async function runDebateCreate({
     });
     history.push({ proposal, critique });
 
-    if (critique.decision === "accept") {
-      return convergedCreateResult({ proposal, critique, transcript });
+    if (critique.decision === "accept" && hasValidAccept(critique, proposal.candidates.length)) {
+      return convergedCreateResult({ proposal, critique, transcript, riskProfile });
     }
   }
 
-  // Deadlock - arbiter decides.
   const arbiterChannel = roleChannel("arbiter", accumulator);
   const decision = await runArbiterCreate({
     history,
@@ -215,8 +226,9 @@ function convergedCreateResult(input: {
   proposal: CreateProposal;
   critique: Critique;
   transcript: AgentThought[];
+  riskProfile: RiskProfile;
 }): OrchestratorResult {
-  const { proposal, critique, transcript } = input;
+  const { proposal, critique, transcript, riskProfile } = input;
   const accepted = critique.judgments.find((j) => j.verdict === "accept")!;
   const recommended = proposal.candidates[accepted.index]!;
   const losingJudgment = critique.judgments.find((j) => j.index !== accepted.index);
@@ -275,8 +287,9 @@ function convergedCreateResult(input: {
       verdict,
       confidence,
       reasons: [
-        critique.rationale,
+        criticAcceptedSummary(buffer, riskProfile),
         accepted.reason,
+        critique.rationale,
         `regime ${surveyed.regime} · vol ${surveyed.realizedVolBps}bps · gas ${proposal.context.gasGwei.toFixed(2)}gwei`,
       ],
     },
@@ -284,10 +297,7 @@ function convergedCreateResult(input: {
   return { plan, ready: { plan, decidedBy: "critic", transcript: [...transcript] } };
 }
 
-function createSnapshot(
-  pool: Pool,
-  candidate: CreateCandidate,
-): PositionSnapshot {
+function createSnapshot(pool: Pool, candidate: CreateCandidate): PositionSnapshot {
   return {
     takenAt: Date.now(),
     range: {

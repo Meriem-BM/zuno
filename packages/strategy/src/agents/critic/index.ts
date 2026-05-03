@@ -25,11 +25,12 @@ const client = new AxlClient({ role: "critic" });
 
 const MAX_ROUNDS = Number.parseInt(process.env.ZUNO_MAX_DEBATE_ROUNDS ?? "2", 10);
 
-// AXL is stateless; we hold per-request history here so a deadlock can
-// be packaged in one envelope.
 const flows = new Map<
   string,
-  { history: Array<{ proposal: Proposal; critique: Critique }>; riskProfile: FlowStart["riskProfile"] }
+  {
+    history: Array<{ proposal: Proposal; critique: Critique }>;
+    riskProfile: FlowStart["riskProfile"];
+  }
 >();
 
 log(`online  peer=${client.peerId.slice(0, 12)}…  axl=${client.apiUrl}  maxRounds=${MAX_ROUNDS}`);
@@ -64,22 +65,29 @@ await client.listen(async (env) => {
     flows.set(env.requestId, slot);
 
     if (critique.decision === "accept") {
-      const ready =
-        proposal.kind === "rebalance"
-          ? buildRebalanceReady(critique)
-          : buildCreateReady(critique as Critique & { proposal: CreateProposal });
-      flows.delete(env.requestId);
-      const planEnv: AxlEnvelope<PlanReady> = {
-        requestId: env.requestId,
-        from: "critic",
-        to: "cli",
-        kind: "plan_ready",
-        payload: ready,
-        ts: Date.now(),
-      };
-      await client.send(planEnv);
-      log(`accept → cli  plan=${ready.plan.id}`);
-      return;
+      const acceptable = critique.judgments.find(
+        (j) => j.verdict === "accept" && j.index >= 0 && j.index < proposal.candidates.length,
+      );
+      if (!acceptable) {
+        critique.decision = "revise";
+      } else {
+        const ready =
+          proposal.kind === "rebalance"
+            ? buildRebalanceReady(critique)
+            : buildCreateReady(critique as Critique & { proposal: CreateProposal });
+        flows.delete(env.requestId);
+        const planEnv: AxlEnvelope<PlanReady> = {
+          requestId: env.requestId,
+          from: "critic",
+          to: "cli",
+          kind: "plan_ready",
+          payload: ready,
+          ts: Date.now(),
+        };
+        await client.send(planEnv);
+        log(`accept → cli  plan=${ready.plan.id}`);
+        return;
+      }
     }
 
     if (slot.history.length >= MAX_ROUNDS) {
@@ -101,7 +109,6 @@ await client.listen(async (env) => {
       return;
     }
 
-    // revise or veto_all with rounds remaining → ask strategist to revise.
     const revEnv: AxlEnvelope<{ critique: Critique; riskProfile?: FlowStart["riskProfile"] }> = {
       requestId: env.requestId,
       from: "critic",

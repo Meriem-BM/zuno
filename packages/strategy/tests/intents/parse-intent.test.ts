@@ -27,6 +27,7 @@ describe("agent wallet intents", () => {
     ["show my zuno wallet", "show_agent_wallet"],
     ["what's my agent wallet", "show_agent_wallet"],
     ["what's my zuno wallet balance", "show_agent_wallet_balance"],
+    ["show my balance", "show_agent_wallet_balance"],
     ["fund my zuno wallet", "fund_agent_wallet"],
     ["deposit into agent wallet", "fund_agent_wallet"],
   ] as const;
@@ -43,6 +44,7 @@ describe("agent wallet intents", () => {
 describe("LP workflow intents", () => {
   it("lists positions in the Zuno wallet", async () => {
     assert.equal((await parseIntent("inspect my positions")).intent, "list_positions");
+    assert.equal((await parseIntent("inspcect positions")).intent, "list_positions");
   });
 
   it("resolves position references from session", async () => {
@@ -51,6 +53,14 @@ describe("LP workflow intents", () => {
     });
     assert.equal(intent.intent, "recommend_rebalance");
     assert.equal(intent.positionId, "42");
+  });
+
+  it("does not resolve stale action ids as position ids", async () => {
+    const intent = await parseIntent("inspect position", {
+      session: session({ lastPositionId: "act_fbddf5315ea6" }),
+    });
+    assert.equal(intent.intent, "needs_clarification");
+    assert.equal(intent.pendingIntent, "inspect_position");
   });
 
   it("resolves plan references through diff, simulation, approval, and apply", async () => {

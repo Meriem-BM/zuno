@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { chainConfig } from "@zuno/chain/config";
 import type { Address, Position, Token } from "@zuno/core";
+import { decodeAbiParameters, decodeFunctionData } from "viem";
 import {
   buildBurn,
   buildCollect,
@@ -22,6 +23,11 @@ const token1: Token = {
   address: "0xaf88d065e77c8cc2239327c5edb3a432268e5831" as Address,
   symbol: "USDC",
   decimals: 6,
+};
+const nativeEth: Token = {
+  address: "0x0000000000000000000000000000000000000000" as Address,
+  symbol: "ETH",
+  decimals: 18,
 };
 
 const position: Position = {
@@ -73,6 +79,69 @@ describe("liquidity calldata", () => {
     assert.equal(tx.value, "0");
     assert.ok(tx.data.startsWith("0x"), "expected encoded calldata");
     assert.match(tx.description, /mint WETH\/USDC 0\.05%/u);
+  });
+
+  it("buildMint sweeps excess native ETH for ETH positions", () => {
+    const tx = buildMint({
+      token0: nativeEth,
+      token1,
+      fee: 3000,
+      tickLower: -200_000,
+      tickUpper: -190_000,
+      currentTick: -198_330,
+      amount0Desired: "100000000000000000",
+      amount1Desired: "200000000",
+      amount0Min: "0",
+      amount1Min: "0",
+      recipient,
+      deadline: 1_900_000_000,
+      chainId: 11155111,
+    });
+    assert.equal(tx.value, "100000000000000000");
+    const decoded = decodeFunctionData({
+      abi: [
+        {
+          type: "function",
+          name: "modifyLiquidities",
+          inputs: [
+            { type: "bytes", name: "unlockData" },
+            { type: "uint256", name: "deadline" },
+          ],
+          outputs: [],
+          stateMutability: "payable",
+        },
+      ],
+      data: tx.data,
+    });
+    const [actions, params] = decodeAbiParameters(
+      [{ type: "bytes" }, { type: "bytes[]" }],
+      decoded.args[0],
+    );
+    const mint = decodeAbiParameters(
+      [
+        {
+          type: "tuple",
+          components: [
+            { type: "address" },
+            { type: "address" },
+            { type: "uint24" },
+            { type: "int24" },
+            { type: "address" },
+          ],
+        },
+        { type: "int24" },
+        { type: "int24" },
+        { type: "uint256" },
+        { type: "uint128" },
+        { type: "uint128" },
+        { type: "address" },
+        { type: "bytes" },
+      ],
+      params[0],
+    );
+    assert.equal(actions, "0x020d14");
+    assert.equal(params.length, 3);
+    assert.ok(mint[3] > 0n);
   });
 
   it("buildIncreaseLiquidity encodes calldata", () => {

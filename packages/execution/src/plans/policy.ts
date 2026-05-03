@@ -1,5 +1,5 @@
 import { chainConfig } from "@zuno/chain/config";
-import { checkApprovalRequirement } from "@zuno/chain/tokens";
+import { checkApprovalRequirement, checkPermit2ApprovalRequirement } from "@zuno/chain/tokens";
 import type { Address, Plan } from "@zuno/core";
 import { POSITION_MANAGER_BY_CHAIN } from "./transaction.js";
 import type {
@@ -45,7 +45,9 @@ export function checkExecutionPolicy(
 
 export async function checkApprovals(plan: Plan, owner: Address): Promise<ApprovalReadiness[]> {
   const chainId = plan.snapshot.position.pool.chainId;
-  const spender = chainConfig(chainId).permit2;
+  const cfg = chainConfig(chainId);
+  const permit2 = cfg.permit2;
+  const positionManager = cfg.positionManager;
 
   const tokens = [
     {
@@ -60,8 +62,6 @@ export async function checkApprovals(plan: Plan, owner: Address): Promise<Approv
 
   const results: ApprovalReadiness[] = [];
   for (const item of tokens) {
-    // Native ETH (currency address 0x0 in v4) needs no ERC20 allowance; the
-    // value flows via msg.value. Skip the allowance check entirely.
     if (item.token.address === "0x0000000000000000000000000000000000000000") {
       results.push({
         tokenSymbol: item.token.symbol,
@@ -72,17 +72,23 @@ export async function checkApprovals(plan: Plan, owner: Address): Promise<Approv
     }
     try {
       const reading = await checkApprovalRequirement(
-        { token: item.token, owner, spender, chainId },
+        { token: item.token, owner, spender: permit2, chainId },
+        item.requiredWei,
+      );
+      const permit2Reading = await checkPermit2ApprovalRequirement(
+        { token: item.token, owner, spender: positionManager, chainId },
         item.requiredWei,
       );
       results.push({
         tokenSymbol: item.token.symbol,
         requiredWei: item.requiredWei.toString(),
         currentAllowanceWei: reading.currentAllowanceWei,
-        sufficient: !reading.needsApproval,
-        reason: reading.needsApproval
-          ? `Approve ${item.token.symbol} for Permit2 before applying.`
-          : undefined,
+        sufficient: !reading.needsApproval && !permit2Reading.needsApproval,
+        reason: permit2Reading.needsApproval
+          ? `Grant Permit2 ${item.token.symbol} spending to the Uniswap v4 PositionManager before applying. Try "approve permit2 ${item.token.symbol}".`
+          : reading.needsApproval
+            ? `Approve ${item.token.symbol} for Permit2 before applying.`
+            : undefined,
       });
     } catch (error) {
       results.push({

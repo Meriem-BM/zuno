@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { afterEach, describe, it } from "node:test";
+import { after, afterEach, before, describe, it } from "node:test";
 import type { Address, Hex, Plan, Position, SessionState } from "@zuno/core";
 import { recommendPlan } from "@zuno/strategy/planner";
 import { createMemoryAlertStore, createMemoryPlanStore } from "@zuno/storage";
@@ -17,6 +17,7 @@ import { TOOLS } from "../src/tools/index.js";
 import type { ExecutionContext } from "../src/contracts/types.js";
 
 const agentWallet = "0xabc1230000000000000000000000000000000def" as Address;
+let prevChainId: string | undefined;
 
 const emptySession: SessionState = {
   userWalletAddress: null,
@@ -30,8 +31,18 @@ const emptySession: SessionState = {
   executionState: "idle",
 };
 
+before(() => {
+  prevChainId = process.env.ZUNO_CHAIN_ID;
+  process.env.ZUNO_CHAIN_ID = "42161";
+});
+
 afterEach(() => {
   delete process.env.ZUNO_UNISWAP_REBALANCE_CALLDATA;
+});
+
+after(() => {
+  if (prevChainId === undefined) delete process.env.ZUNO_CHAIN_ID;
+  else process.env.ZUNO_CHAIN_ID = prevChainId;
 });
 
 describe("executor agent wallet lifecycle", () => {
@@ -143,7 +154,6 @@ describe("executor plan approval and execution", () => {
         }),
         planStore: createMemoryPlanStore([plan]),
         executionReadiness: { checkAllowances: false, checkChain: false },
-        // No walletService - Turnkey signing must fail closed.
       }),
     );
 

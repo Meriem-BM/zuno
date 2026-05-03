@@ -9,11 +9,12 @@ import {
   publicClient,
   readToken,
 } from "./lib/helpers.js";
+import { POSITION_MANAGER_ABI, STATE_VIEW_ABI, ZERO_ADDRESS } from "./lib/constants.js";
 import {
-  POSITION_MANAGER_ABI,
-  STATE_VIEW_ABI,
-  ZERO_ADDRESS,
-} from "./lib/constants.js";
+  ownedTokenIds,
+  PositionDetailsReadError,
+  type PositionDiscoveryClient,
+} from "./lib/discovery.js";
 import type { PositionReadOptions } from "./types.js";
 import { distanceFromBoundary, inRange, tickToPrice, utilization } from "../math/tick-math.js";
 
@@ -26,6 +27,7 @@ export {
   type PoolKey,
 } from "./lib/helpers.js";
 export { STATE_VIEW_ABI, ZERO_ADDRESS } from "./lib/constants.js";
+export { PositionDetailsReadError } from "./lib/discovery.js";
 
 export async function getPosition(
   id: string,
@@ -60,17 +62,8 @@ export async function getPosition(
     }),
   ]);
 
-  const [poolKeyRaw, positionInfoRaw] = poolResult as readonly [
-    readonly unknown[],
-    bigint,
-  ];
-  const poolKey = {
-    currency0: poolKeyRaw[0] as Address,
-    currency1: poolKeyRaw[1] as Address,
-    fee: Number(poolKeyRaw[2]),
-    tickSpacing: Number(poolKeyRaw[3]),
-    hooks: poolKeyRaw[4] as Address,
-  };
+  const [poolKeyRaw, positionInfoRaw] = poolResult as readonly [readonly unknown[], bigint];
+  const poolKey = normalizePoolKey(poolKeyRaw);
   const { tickLower, tickUpper } = decodePositionInfo(positionInfoRaw);
   const poolId = poolIdFor(poolKey);
 
@@ -136,37 +129,55 @@ export async function getPosition(
   };
 }
 
+function normalizePoolKey(raw: readonly unknown[] | Record<string, unknown>) {
+  if (Array.isArray(raw)) {
+    return {
+      currency0: raw[0] as Address,
+      currency1: raw[1] as Address,
+      fee: Number(raw[2]),
+      tickSpacing: Number(raw[3]),
+      hooks: raw[4] as Address,
+    };
+  }
+  const key = raw as Record<string, unknown>;
+  return {
+    currency0: key.currency0 as Address,
+    currency1: key.currency1 as Address,
+    fee: Number(key.fee),
+    tickSpacing: Number(key.tickSpacing),
+    hooks: key.hooks as Address,
+  };
+}
+
 export async function listPositions(
   owner: Address,
   options: PositionReadOptions = {},
 ): Promise<Position[]> {
   const chain = chainConfig(options.chainId);
   const client = options.client ?? publicClient(chain.id);
-  const nextTokenId = (await client.readContract({
-    address: chain.positionManager,
-    abi: POSITION_MANAGER_ABI,
-    functionName: "nextTokenId",
-    args: [],
-  })) as bigint;
 
-  const positions: Position[] = [];
-  for (let tokenId = 1n; tokenId < nextTokenId; tokenId += 1n) {
-    try {
-      const actualOwner = (await client.readContract({
-        address: chain.positionManager,
-        abi: POSITION_MANAGER_ABI,
-        functionName: "ownerOf",
-        args: [tokenId],
-      })) as Address;
-      if (actualOwner.toLowerCase() !== owner.toLowerCase()) continue;
-      positions.push(
-        await getPosition(tokenId.toString(), { ...options, owner, client, chainId: chain.id }),
-      );
-    } catch {
-      continue;
-    }
+  const owned = await ownedTokenIds(
+    chain.id,
+    chain.positionManager,
+    owner,
+    client as PositionDiscoveryClient,
+  );
+  if (owned.length === 0) return [];
+
+  const settled = await Promise.allSettled(
+    owned.map((tokenId) =>
+      getPosition(tokenId.toString(), { ...options, owner, client, chainId: chain.id }),
+    ),
+  );
+  const positions = settled.flatMap((result) =>
+    result.status === "fulfilled" ? [result.value] : [],
+  );
+  const failed = settled.flatMap((result, index) =>
+    result.status === "rejected" ? [owned[index]!] : [],
+  );
+  if (failed.length > 0) {
+    throw new PositionDetailsReadError(failed, positions);
   }
-
   return positions;
 }
 

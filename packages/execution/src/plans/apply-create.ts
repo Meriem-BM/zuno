@@ -1,5 +1,5 @@
 import { chainConfig, viemChainFor } from "@zuno/chain/config";
-import { checkApprovalRequirement } from "@zuno/chain/tokens";
+import { checkApprovalRequirement, checkPermit2ApprovalRequirement } from "@zuno/chain/tokens";
 import type { Address, ChainId, Token } from "@zuno/core";
 import { createPublicClient, erc20Abi, formatUnits, http } from "viem";
 import type { ApprovalReadiness, CreateApplyReadiness } from "./types.js";
@@ -16,15 +16,15 @@ interface CreateAction {
   };
 }
 
-// Pre-apply readiness for create-position: balance check (native + ERC20)
-// plus Permit2 allowance check for ERC20 deposits. Mirrors the rebalance gate.
 export async function prepareCreateApply(
   action: CreateAction,
   owner: Address,
 ): Promise<CreateApplyReadiness> {
   const { summary } = action;
   const chainId = summary.chainId;
-  const spender = chainConfig(chainId).permit2;
+  const cfg = chainConfig(chainId);
+  const permit2 = cfg.permit2;
+  const positionManager = cfg.positionManager;
   const items = [
     { token: summary.pool.token0, requiredWei: safeBigInt(summary.amount0Max) },
     { token: summary.pool.token1, requiredWei: safeBigInt(summary.amount1Max) },
@@ -69,17 +69,31 @@ export async function prepareCreateApply(
         );
       }
       const reading = await checkApprovalRequirement(
-        { token: item.token, owner, spender, chainId },
+        { token: item.token, owner, spender: permit2, chainId },
         item.requiredWei,
       );
       if (reading.needsApproval) {
         warnings.push(`Approve ${item.token.symbol} for Permit2 before applying.`);
       }
+      const permit2Reading = await checkPermit2ApprovalRequirement(
+        { token: item.token, owner, spender: positionManager, chainId },
+        item.requiredWei,
+      );
+      if (permit2Reading.needsApproval) {
+        warnings.push(
+          `Grant Permit2 ${item.token.symbol} spending to the Uniswap v4 PositionManager before applying. Try "approve permit2 ${item.token.symbol}".`,
+        );
+      }
       readiness.push({
         tokenSymbol: item.token.symbol,
         requiredWei: item.requiredWei.toString(),
         currentAllowanceWei: reading.currentAllowanceWei,
-        sufficient: balanceOk && !reading.needsApproval,
+        sufficient: balanceOk && !reading.needsApproval && !permit2Reading.needsApproval,
+        reason: permit2Reading.needsApproval
+          ? "Permit2 spender approval is required for the Uniswap v4 PositionManager."
+          : reading.needsApproval
+            ? "ERC20 approval to Permit2 is required."
+            : undefined,
       });
     } catch (e) {
       warnings.push(`Could not verify ${item.token.symbol}: ${errorMessage(e)}`);

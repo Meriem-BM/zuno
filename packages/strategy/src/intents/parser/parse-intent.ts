@@ -73,8 +73,7 @@ export function parseIntentDeterministic(rawInput: string, session?: SessionStat
 
   const resolved = resolveReferences(scored.intent, scored.text, scored.entities, session);
 
-  const createGoal =
-    scored.intent === "create_position" ? extractCreateGoal(trimmed) : undefined;
+  const createGoal = scored.intent === "create_position" ? extractCreateGoal(trimmed) : undefined;
 
   return validateIntent({
     intent: scored.intent,
@@ -143,12 +142,18 @@ function resolveReferences(
   const out = { ...entities };
 
   if (!out.positionId && POSITION_INTENTS.has(intent)) {
-    if ((POSITION_REFS.test(text) || isShortCommandLikeInput(text)) && session.lastPositionId) {
+    if (
+      (POSITION_REFS.test(text) || isShortCommandLikeInput(text)) &&
+      isPositionTokenId(session.lastPositionId)
+    ) {
       out.positionId = session.lastPositionId;
     }
   }
   if (!out.planId && ACTION_INTENTS.has(intent)) {
-    if ((PLAN_REFS.test(text) || /\bit\b/u.test(text) || isShortCommandLikeInput(text)) && session.lastActionId) {
+    if (
+      (PLAN_REFS.test(text) || /\bit\b/u.test(text) || isShortCommandLikeInput(text)) &&
+      session.lastActionId
+    ) {
       out.planId = session.lastActionId;
     } else if (
       (PLAN_REFS.test(text) || /\bit\b/u.test(text) || isShortCommandLikeInput(text)) &&
@@ -170,4 +175,8 @@ function resolveReferences(
 
 function isShortCommandLikeInput(text: string): boolean {
   return text.split(/\s+/u).filter(Boolean).length <= 4;
+}
+
+function isPositionTokenId(value: string | null | undefined): value is string {
+  return typeof value === "string" && /^\d+$/u.test(value);
 }

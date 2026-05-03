@@ -16,6 +16,8 @@ import type {
   ApprovalTransaction,
   BalanceSnapshot,
   FetchBalancesOptions,
+  Permit2AllowanceReading,
+  Permit2ApprovalRequirement,
   ReadAllowanceOptions,
   TokenReadClient,
 } from "./types.js";
@@ -110,6 +112,79 @@ export async function checkApprovalRequirement(
   };
 }
 
+const PERMIT2_ALLOWANCE_ABI = [
+  {
+    type: "function",
+    name: "allowance",
+    stateMutability: "view",
+    inputs: [
+      { name: "user", type: "address" },
+      { name: "token", type: "address" },
+      { name: "spender", type: "address" },
+    ],
+    outputs: [
+      { name: "amount", type: "uint160" },
+      { name: "expiration", type: "uint48" },
+      { name: "nonce", type: "uint48" },
+    ],
+  },
+] as const;
+
+export async function readPermit2Allowance(
+  query: AllowanceQuery,
+  options: ReadAllowanceOptions = {},
+): Promise<Permit2AllowanceReading> {
+  const client = options.client ?? defaultClient(query.chainId);
+  const permit2 = chainConfig(query.chainId).permit2;
+  const result = await client.readContract({
+    address: permit2,
+    abi: PERMIT2_ALLOWANCE_ABI,
+    functionName: "allowance",
+    args: [query.owner, query.token.address, query.spender],
+  });
+  const { amount, expiration, nonce } = parsePermit2Allowance(result);
+  const expired = amount > 0n && expiration <= Math.floor(Date.now() / 1000);
+
+  const reading: Permit2AllowanceReading = {
+    token: query.token,
+    owner: query.owner,
+    spender: query.spender,
+    chainId: query.chainId,
+    allowanceWei: amount.toString(),
+    expiration,
+    nonce,
+    expired,
+  };
+
+  if (options.requiredWei !== undefined) {
+    reading.sufficient = amount >= options.requiredWei && !expired;
+    reading.requiredWei = options.requiredWei.toString();
+  }
+  return reading;
+}
+
+export async function checkPermit2ApprovalRequirement(
+  query: AllowanceQuery,
+  requiredWei: bigint,
+  options: { client?: TokenReadClient } = {},
+): Promise<Permit2ApprovalRequirement> {
+  const reading = await readPermit2Allowance(query, {
+    client: options.client,
+    requiredWei,
+  });
+  return {
+    token: query.token,
+    owner: query.owner,
+    spender: query.spender,
+    chainId: query.chainId,
+    currentAllowanceWei: reading.allowanceWei,
+    expiration: reading.expiration,
+    requiredWei: requiredWei.toString(),
+    needsApproval: !reading.sufficient,
+    expired: Boolean(reading.expired),
+  };
+}
+
 export function buildApproveTransaction(
   token: Token,
   spender: Address,
@@ -128,4 +203,27 @@ export function buildApproveTransaction(
     value: "0",
     description: `approve ${formatAmount(amountWei, token.decimals)} ${token.symbol} for ${shortAddr(spender)}`,
   };
+}
+
+function parsePermit2Allowance(result: unknown): {
+  amount: bigint;
+  expiration: number;
+  nonce: number;
+} {
+  if (Array.isArray(result)) {
+    return {
+      amount: BigInt(result[0] as bigint | number | string),
+      expiration: Number(result[1]),
+      nonce: Number(result[2]),
+    };
+  }
+  if (result && typeof result === "object") {
+    const record = result as { amount?: unknown; expiration?: unknown; nonce?: unknown };
+    return {
+      amount: BigInt(record.amount as bigint | number | string),
+      expiration: Number(record.expiration),
+      nonce: Number(record.nonce),
+    };
+  }
+  throw new Error("Unexpected Permit2 allowance response.");
 }

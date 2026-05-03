@@ -1,9 +1,4 @@
-import type {
-  CreateGoal,
-  MarketRegime,
-  PositionSnapshot,
-  SurveyedPool,
-} from "@zuno/core";
+import type { CreateGoal, MarketRegime, PositionSnapshot, SurveyedPool } from "@zuno/core";
 import type { GasReading } from "../shared/lib/gas.js";
 import type { RiskContext } from "../../planner/index.js";
 import { regimeCaption } from "../shared/lib/regime.js";
@@ -43,8 +38,6 @@ export function scoutUserMessage({ snapshot, riskCtx, gas, regime }: ScoutPrompt
   ].join("\n");
 }
 
-// === CREATE ===
-
 export const SCOUT_CREATE_SYSTEM = `You are SCOUT in CREATE mode. The user wants to open a new LP position on Uniswap v4.
 
 You receive:
@@ -73,6 +66,8 @@ export function scoutCreateUserMessage({
   lines.push("Goal:");
   if (goal.capital)
     lines.push(`  capital: ${goal.capital.amount} ${goal.capital.tokenSymbol.toUpperCase()}`);
+  if (goal.capital2)
+    lines.push(`  capital2: ${goal.capital2.amount} ${goal.capital2.tokenSymbol.toUpperCase()}`);
   if (goal.riskProfile) lines.push(`  riskProfile: ${goal.riskProfile}`);
   if (goal.exposurePreference) lines.push(`  exposurePreference: ${goal.exposurePreference}`);
   if (goal.pinnedPair)

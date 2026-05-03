@@ -43,13 +43,16 @@ export const INTENT_KINDS = [
 const RiskProfileEnum = z.enum(["conservative", "balanced", "aggressive"]);
 const ExposureEnum = z.enum(["stay-in-token", "neutral"]);
 
+const CapitalSchema = z
+  .object({
+    tokenSymbol: z.string().nullish(),
+    amount: z.string().nullish(),
+  })
+  .nullish();
+
 const CreateGoalSchema = z.object({
-  capital: z
-    .object({
-      tokenSymbol: z.string().nullish(),
-      amount: z.string().nullish(),
-    })
-    .nullish(),
+  capital: CapitalSchema,
+  capital2: CapitalSchema,
   riskProfile: RiskProfileEnum.nullish(),
   exposurePreference: ExposureEnum.nullish(),
   pinnedPair: z
@@ -72,7 +75,6 @@ export const IntentSchema = z.object({
   tokenOutSymbol: z.string().nullish(),
   chainName: z.string().nullish(),
   clarification: z.string().nullish(),
-  // Filled when intent === "create_position". May be partial.
   createGoal: CreateGoalSchema.nullish(),
 });
 
@@ -104,17 +106,10 @@ type RawCreateGoal = z.infer<typeof CreateGoalSchema>;
 
 function cleanCreateGoal(raw: RawCreateGoal): Intent["createGoal"] & object {
   const out: NonNullable<Intent["createGoal"]> = {};
-  if (raw.capital) {
-    const capital: { tokenSymbol?: string; amount?: string } = {};
-    if (raw.capital.tokenSymbol) capital.tokenSymbol = raw.capital.tokenSymbol.toLowerCase();
-    if (raw.capital.amount) capital.amount = raw.capital.amount.replace(",", ".");
-    if (capital.tokenSymbol || capital.amount) {
-      out.capital = {
-        tokenSymbol: capital.tokenSymbol ?? "",
-        amount: capital.amount ?? "",
-      };
-    }
-  }
+  const c1 = cleanCapital(raw.capital);
+  if (c1) out.capital = c1;
+  const c2 = cleanCapital(raw.capital2);
+  if (c2) out.capital2 = c2;
   if (raw.riskProfile) out.riskProfile = raw.riskProfile;
   if (raw.exposurePreference) out.exposurePreference = raw.exposurePreference;
   if (raw.pinnedPair) {
@@ -125,4 +120,14 @@ function cleanCreateGoal(raw: RawCreateGoal): Intent["createGoal"] & object {
   }
   if (raw.pinnedFeeTier) out.pinnedFeeTier = raw.pinnedFeeTier;
   return out;
+}
+
+function cleanCapital(
+  raw: { tokenSymbol?: string | null; amount?: string | null } | null | undefined,
+): { tokenSymbol: string; amount: string } | null {
+  if (!raw) return null;
+  const tokenSymbol = raw.tokenSymbol ? raw.tokenSymbol.toLowerCase() : "";
+  const amount = raw.amount ? raw.amount.replace(",", ".") : "";
+  if (!tokenSymbol && !amount) return null;
+  return { tokenSymbol, amount };
 }

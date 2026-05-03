@@ -19,6 +19,9 @@ export function ApplyConfirmation({ result }: ApplyConfirmationProps): React.Rea
   if (data.kind === "swap") {
     return <SwapConfirmation data={data} />;
   }
+  if (data.kind === "approve") {
+    return <ApproveConfirmation data={data} />;
+  }
   const verdictColor =
     data.verdict === "approve"
       ? palette.ok
@@ -162,6 +165,37 @@ function SwapConfirmation({ data }: { data: ApplyPlanData }): React.ReactElement
         </Text>
       </Box>
       <Box flexDirection="column">
+        <Row k="zuno wallet" v={data.agentWalletAddress} />
+        <Row k="approval" v={data.approvalState} accent />
+        <Row k="execution" v={data.executionState} accent={data.executionState === "submitted"} />
+        {data.transactionHash ? <Row k="tx" v={data.transactionHash} /> : null}
+        {data.turnkeyActivityId ? <Row k="turnkey" v={data.turnkeyActivityId} muted /> : null}
+      </Box>
+      <Text color={palette.muted}>{`  ${HR}`}</Text>
+    </Box>
+  );
+}
+
+function ApproveConfirmation({ data }: { data: ApplyPlanData }): React.ReactElement {
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <Text color={palette.muted}>{`  ${HR}`}</Text>
+      <Box marginTop={1}>
+        <Text color={palette.accent} bold>{`  ${symbols.diamond} approve token `}</Text>
+        <Text color={palette.fg} bold>
+          {data.tokenSymbol ?? ""}
+        </Text>
+      </Box>
+
+      <Box marginTop={1} flexDirection="column">
+        <Section title="approval" />
+        <Row k="token" v={data.tokenSymbol ?? ""} />
+        <Row k="amount" v={data.tokenAmount ?? "unlimited"} />
+        <Row k="spender" v={data.spenderLabel ?? ""} />
+        {data.spenderAddress ? <Row k="address" v={data.spenderAddress} muted /> : null}
+      </Box>
+
+      <Box flexDirection="column" marginTop={1}>
         <Row k="zuno wallet" v={data.agentWalletAddress} />
         <Row k="approval" v={data.approvalState} accent />
         <Row k="execution" v={data.executionState} accent={data.executionState === "submitted"} />

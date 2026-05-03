@@ -1,9 +1,14 @@
-import { prepareApply, prepareCreateApply, simulatePlan as simulateStoredPlan } from "@zuno/execution";
+import {
+  prepareApply,
+  prepareCreateApply,
+  simulatePlan as simulateStoredPlan,
+} from "@zuno/execution";
 import type { Hex, Plan, PreparedActionRecord } from "@zuno/core";
 import { buildPlanDiff } from "@zuno/strategy/planner";
 import type {
   ApplyPlanData,
   ApprovePlanData,
+  ApproveTokenSummary,
   CreatePositionPreparedActionSummary,
   ToolDefinition,
   SwapPreparedActionSummary,
@@ -97,16 +102,20 @@ const approvePlan: ToolDefinition<ApprovePlanData> = {
           preview.warnings[0] ?? preview.summary,
         );
       }
-      return ok("approvePlan", `Approved ${planId}. Turnkey signing is now allowed for this plan.`, {
-        kind: "plan",
-        planId,
-        positionId: action.record.positionId,
-        agentWalletAddress: target.address,
-        approvalState: "approved",
-        executionState: "approved",
-        summary: preview.summary,
-        warnings: preview.warnings,
-      });
+      return ok(
+        "approvePlan",
+        `Approved ${planId}. Turnkey signing is now allowed for this plan.`,
+        {
+          kind: "plan",
+          planId,
+          positionId: action.record.positionId,
+          agentWalletAddress: target.address,
+          approvalState: "approved",
+          executionState: "approved",
+          summary: preview.summary,
+          warnings: preview.warnings,
+        },
+      );
     }
 
     if (action.kind === "create") {
@@ -128,6 +137,33 @@ const approvePlan: ToolDefinition<ApprovePlanData> = {
           confidence: 1,
           reasons: ["create-position prepared from agent debate"],
           signer: "turnkey",
+        },
+      );
+    }
+
+    if (action.kind === "approve") {
+      const summary = action.record.summary;
+      return ok(
+        "approvePlan",
+        `Approved ${summary.tokenSymbol} approval ${planId}. Turnkey signing is now allowed.`,
+        {
+          kind: "approve",
+          planId,
+          actionId: planId,
+          positionId: planId,
+          agentWalletAddress: target.address,
+          approvalState: "approved",
+          executionState: "approved",
+          summary: `approve ${summary.amount} ${summary.tokenSymbol} for ${summary.spenderLabel}`,
+          warnings: [],
+          verdict: "approve",
+          confidence: 1,
+          reasons: ["approval prepared"],
+          signer: "turnkey",
+          tokenSymbol: summary.tokenSymbol,
+          tokenAmount: summary.amount,
+          spenderLabel: summary.spenderLabel,
+          spenderAddress: summary.spenderAddress,
         },
       );
     }
@@ -231,14 +267,9 @@ const applyPlan: ToolDefinition<ApplyPlanData> = {
           "No executable mint transaction was prepared.",
         );
       }
-      // Mirror the rebalance gate: balance + Permit2 readiness before signing.
       const readiness = await prepareCreateApply(action.record, target.address);
       if (readiness.status === "blocked") {
-        return err(
-          "applyPlan",
-          "EXECUTION_NOT_AVAILABLE",
-          readiness.warnings.join(" "),
-        );
+        return err("applyPlan", "EXECUTION_NOT_AVAILABLE", readiness.warnings.join(" "));
       }
       try {
         const signed = await walletService(ctx).signAndSubmit({
@@ -280,10 +311,71 @@ const applyPlan: ToolDefinition<ApplyPlanData> = {
       }
     }
 
+    if (action.kind === "approve") {
+      const tx = action.record.transactions[0];
+      if (!tx) {
+        return err(
+          "applyPlan",
+          "EXECUTION_NOT_AVAILABLE",
+          "No executable approval transaction was prepared.",
+        );
+      }
+      try {
+        const signed = await walletService(ctx).signAndSubmit({
+          from: tx.from ?? target.address,
+          to: tx.to,
+          chainId: tx.chainId,
+          data: tx.data as Hex,
+          value: tx.value,
+        });
+        const summary = action.record.summary;
+        return ok(
+          "applyPlan",
+          `Submitted ${summary.tokenSymbol} approval through the Turnkey-backed Zuno wallet.`,
+          {
+            kind: "approve",
+            planId,
+            actionId: planId,
+            positionId: planId,
+            agentWalletAddress: target.address,
+            approvalState: "approved",
+            executionState: "submitted",
+            status: "submitted",
+            summary: `approve ${summary.amount} ${summary.tokenSymbol} for ${summary.spenderLabel}`,
+            pair: summary.tokenSymbol,
+            feeTier: 0,
+            oldRange: { priceLower: 0, priceUpper: 0 },
+            newRange: { priceLower: 0, priceUpper: 0 },
+            residual: { token0: "0", token1: "0" },
+            estimatedGas: "unavailable",
+            estimatedGasUsd: 0,
+            estimatedSlippage: 0,
+            verdict: "approve",
+            confidence: 1,
+            reasons: ["approval submitted"],
+            warnings: [],
+            signer: "turnkey",
+            transactionHash: signed.transactionHash,
+            turnkeyActivityId: signed.turnkeyActivityId,
+            tokenSymbol: summary.tokenSymbol,
+            tokenAmount: summary.amount,
+            spenderLabel: summary.spenderLabel,
+            spenderAddress: summary.spenderAddress,
+          },
+        );
+      } catch (error) {
+        return err("applyPlan", "TURNKEY_SIGNING_FAILED", errorMessage(error));
+      }
+    }
+
     try {
       const tx = action.record.transactions[0];
       if (!tx) {
-        return err("applyPlan", "EXECUTION_NOT_AVAILABLE", "No executable swap transaction was prepared.");
+        return err(
+          "applyPlan",
+          "EXECUTION_NOT_AVAILABLE",
+          "No executable swap transaction was prepared.",
+        );
       }
       const signed = await walletService(ctx).signAndSubmit({
         from: tx.from ?? target.address,
@@ -349,6 +441,7 @@ async function loadAction(
   | { kind: "plan"; record: Plan }
   | { kind: "swap"; record: PreparedActionRecord<SwapPreparedActionSummary> }
   | { kind: "create"; record: PreparedActionRecord<CreatePositionPreparedActionSummary> }
+  | { kind: "approve"; record: PreparedActionRecord<ApproveTokenSummary> }
   | null
 > {
   const plan = await planStore(ctx).get(id);
@@ -363,6 +456,12 @@ async function loadAction(
     return {
       kind: "create",
       record: action as PreparedActionRecord<CreatePositionPreparedActionSummary>,
+    };
+  }
+  if (action.kind === "approve") {
+    return {
+      kind: "approve",
+      record: action as PreparedActionRecord<ApproveTokenSummary>,
     };
   }
   return null;

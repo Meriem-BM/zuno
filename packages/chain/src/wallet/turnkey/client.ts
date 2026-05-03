@@ -1,8 +1,8 @@
 import { chainConfig } from "@zuno/chain/config";
 import type { Address, ChainId, Hex } from "@zuno/core";
-import { formatUnits } from "viem";
+import { formatUnits, serializeTransaction } from "viem";
 import { userScopedClient } from "./auth.js";
-import { caip2For, publicClient } from "./lib/helpers.js";
+import { publicClient } from "./lib/helpers.js";
 import type {
   AgentWallet,
   AgentWalletBalance,
@@ -42,32 +42,42 @@ class SessionScopedTurnkeyService implements AgentWalletService {
 
   async signAndSubmit(tx: TurnkeyTransactionRequest): Promise<TurnkeySignResult> {
     const apiClient = userScopedClient(this.session).apiClient();
-    const result = await apiClient.ethSendTransaction({
-      from: tx.from,
-      // Turnkey's generated CAIP-2 typing is narrower than the set of EVM chains we support.
-      caip2: caip2For(tx.chainId) as never,
+    const client = publicClient(tx.chainId);
+
+    const value = tx.value ? BigInt(tx.value) : 0n;
+    const [nonce, fees, gasLimit] = await Promise.all([
+      client.getTransactionCount({ address: tx.from, blockTag: "pending" }),
+      client.estimateFeesPerGas(),
+      client.estimateGas({
+        account: tx.from,
+        to: tx.to,
+        data: tx.data,
+        value,
+      }),
+    ]);
+
+    const unsignedSerialized = serializeTransaction({
+      chainId: tx.chainId,
+      type: "eip1559",
       to: tx.to,
-      value: tx.value,
       data: tx.data,
-      sponsor: false,
+      value,
+      nonce: Number(nonce),
+      gas: gasLimit,
+      maxFeePerGas: fees.maxFeePerGas ?? 0n,
+      maxPriorityFeePerGas: fees.maxPriorityFeePerGas ?? 0n,
     });
-    const turnkeyActivityId = result.sendTransactionStatusId ?? result.activity?.id;
-    // Poll Turnkey for the broadcast transaction hash. Bounded so a stuck
-    // submission still returns to the caller in reasonable time.
-    let transactionHash: Hex | undefined;
-    if (result.sendTransactionStatusId) {
-      try {
-        const status = (await apiClient.pollTransactionStatus({
-          sendTransactionStatusId: result.sendTransactionStatusId,
-          organizationId: this.session.subOrganizationId,
-          pollingIntervalMs: 1000,
-          timeoutMs: 30_000,
-        })) as { eth?: { txHash?: string } };
-        if (status.eth?.txHash) transactionHash = status.eth.txHash as Hex;
-      } catch {
-        // Hash unavailable in time; fall back to activityId only.
-      }
-    }
+
+    const signResult = await apiClient.signTransaction({
+      signWith: tx.from,
+      unsignedTransaction: unsignedSerialized.replace(/^0x/, ""),
+      type: "TRANSACTION_TYPE_ETHEREUM",
+    });
+
+    const signedHex = `0x${signResult.signedTransaction.replace(/^0x/, "")}` as Hex;
+    const transactionHash = await client.sendRawTransaction({ serializedTransaction: signedHex });
+    const turnkeyActivityId = signResult.activity?.id;
+
     return { status: "submitted", transactionHash, turnkeyActivityId };
   }
 

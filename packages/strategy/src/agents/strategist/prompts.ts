@@ -71,7 +71,8 @@ export function strategistRevisionUserMessage({
     "",
     "Critic judgments:",
     ...priorCritique.judgments.map(
-      (j) => `  [${j.index}] ${j.verdict.toUpperCase()} - ${j.reason}${j.suggestion ? `  → suggest: ${j.suggestion}` : ""}`,
+      (j) =>
+        `  [${j.index}] ${j.verdict.toUpperCase()} - ${j.reason}${j.suggestion ? `  → suggest: ${j.suggestion}` : ""}`,
     ),
     "",
     `Critic rationale: ${priorCritique.rationale}`,
@@ -80,8 +81,6 @@ export function strategistRevisionUserMessage({
   ];
   return lines.join("\n");
 }
-
-// === CREATE ===
 
 export const STRATEGIST_CREATE_SYSTEM = `You are STRATEGIST in CREATE mode. The user wants to OPEN a new Uniswap v4 LP position.
 
@@ -114,9 +113,7 @@ interface CreateInitialInput {
   context: CreateContext;
 }
 
-export function strategistCreateInitialUserMessage({
-  context,
-}: CreateInitialInput): string {
+export function strategistCreateInitialUserMessage({ context }: CreateInitialInput): string {
   const lines: string[] = [];
   lines.push("INITIAL PROPOSAL - CREATE");
   lines.push("");
@@ -126,6 +123,10 @@ export function strategistCreateInitialUserMessage({
   if (context.goal.capital)
     lines.push(
       `  capital: ${context.goal.capital.amount} ${context.goal.capital.tokenSymbol.toUpperCase()}`,
+    );
+  if (context.goal.capital2)
+    lines.push(
+      `  capital2: ${context.goal.capital2.amount} ${context.goal.capital2.tokenSymbol.toUpperCase()}`,
     );
   if (context.goal.riskProfile) lines.push(`  riskProfile: ${context.goal.riskProfile}`);
   if (context.goal.exposurePreference)
