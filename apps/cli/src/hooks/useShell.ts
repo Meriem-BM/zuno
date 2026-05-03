@@ -22,6 +22,7 @@ import type { AuthFlowState, Shell, Turn } from "../types/index.js";
 import { WALLET_INTENTS } from "../lib/constants.js";
 import {
   configuredFallbackProvider,
+  environmentNotices,
   errorMessage,
   isOtpExpiredError,
   sanitizeInput,
@@ -51,6 +52,7 @@ export function useShell(): Shell {
   );
 
   const fallbackProvider = useMemo(() => configuredFallbackProvider(), []);
+  const envNotices = useMemo(() => environmentNotices(), []);
   const fallback = useMemo(() => {
     const modelFallback = createModelFallback();
     return {
@@ -286,6 +288,7 @@ export function useShell(): Shell {
     pending,
     fallbackActive,
     fallbackProvider,
+    environmentNotices: envNotices,
     thoughts,
     auth,
     setDraft,

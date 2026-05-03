@@ -1,6 +1,7 @@
 import type { Intent } from "@zuno/strategy/intents";
 import type { ToolExecutionResult } from "@zuno/runtime";
 import type { AgentThought, SessionState } from "@zuno/core";
+import type { EnvironmentNotice } from "../lib/helpers.js";
 
 export interface Turn {
   id: number;
@@ -16,6 +17,7 @@ export interface Shell {
   pending: string | null;
   fallbackActive: boolean;
   fallbackProvider: string | null;
+  environmentNotices: EnvironmentNotice[];
   thoughts: AgentThought[];
   auth: AuthFlowState | null;
   setDraft: (value: string) => void;

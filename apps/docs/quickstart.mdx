@@ -15,8 +15,12 @@ For the published CLI:
 
 ```bash
 npm install -g @zunocli/cli
+export OPENAI_API_KEY=sk-...
+export ZUNO_ARBITRUM_RPC_URL=https://...
 zuno
 ```
+
+The published CLI uses the hosted Zuno auth proxy for Turnkey email OTP. Users should provide their own OpenAI/Groq, RPC, and Uniswap Trading API keys as environment variables. Missing optional env is shown as a non-blocking notice when `zuno` starts.
 
 For source development:
 
@@ -26,7 +30,7 @@ cd zuno
 pnpm install
 ```
 
-Configure the Turnkey-backed Zuno wallet, chain, and AXL peer ids:
+For source development, configure the Turnkey-backed Zuno wallet, chain, and AXL peer ids:
 
 ```bash
 export ZUNO_AGENT_WALLET_ADDRESS=0x...

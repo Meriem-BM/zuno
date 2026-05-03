@@ -5,6 +5,8 @@ description: The interactive shell workflow.
 
 ```
 npm install -g @zunocli/cli
+export OPENAI_API_KEY=sk-...
+export ZUNO_ARBITRUM_RPC_URL=https://...
 zuno
 
 create my zuno wallet
@@ -21,6 +23,8 @@ apply it
 refresh pools
 show alerts
 ```
+
+At startup, Zuno prints a short env notice when optional keys are missing. Add the keys to your shell profile (`~/.zshrc`, `~/.bashrc`, etc.) if you want them available every time.
 
 | intent       | summary                                                      |
 |--------------|--------------------------------------------------------------|

@@ -153,4 +153,15 @@ The parent-org credentials in `.env` are used only to send the OTP and create th
 
 ## Environment
 
-See [`.env.example`](./.env.example). Supported chains are mainnet, optimism, base, arbitrum, sepolia, base sepolia, arbitrum sepolia, and unichain sepolia. RPC URLs are optional. The intent fallback supports `openai` and `groq`; deterministic rules run first either way. Standalone swaps use the Uniswap Trading API and require `ZUNO_UNISWAP_TRADING_API_KEY`. The agent debate requires `OPENAI_API_KEY`; tune the model with `ZUNO_AGENT_MODEL`, the round cap with `ZUNO_MAX_DEBATE_ROUNDS`, and the user's risk profile with `ZUNO_RISK_PROFILE`.
+For the published CLI, users provide their own service keys as shell env vars:
+
+```bash
+export OPENAI_API_KEY=sk-...
+export ZUNO_ARBITRUM_RPC_URL=https://...
+export ZUNO_UNISWAP_TRADING_API_KEY=...
+zuno
+```
+
+The CLI prints a non-blocking startup notice for missing optional env. Wallet sign-in uses the hosted auth proxy baked into the published bundle; self-hosters can set `ZUNO_AUTH_PROXY_URL` or local Turnkey parent credentials.
+
+See [`.env.example`](./.env.example). Supported chains are mainnet, optimism, base, arbitrum, sepolia, base sepolia, arbitrum sepolia, and unichain sepolia. RPC URLs are optional but strongly recommended to avoid public RPC limits. The intent fallback supports `openai` and `groq`; deterministic rules run first either way. Standalone swaps use the Uniswap Trading API and require `ZUNO_UNISWAP_TRADING_API_KEY`. The agent debate requires `OPENAI_API_KEY`; tune the model with `ZUNO_AGENT_MODEL`, the round cap with `ZUNO_MAX_DEBATE_ROUNDS`, and the user's risk profile with `ZUNO_RISK_PROFILE`.

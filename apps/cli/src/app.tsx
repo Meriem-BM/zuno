@@ -19,6 +19,7 @@ export function App(): React.ReactElement {
     pending,
     fallbackActive,
     fallbackProvider,
+    environmentNotices,
     thoughts,
     auth,
     setDraft,
@@ -48,6 +49,7 @@ export function App(): React.ReactElement {
           )
         }
       </Static>
+      <EnvironmentNoticePanel notices={environmentNotices} />
       {auth ? (
         <AuthFlow state={auth} draft={draft} onChange={setDraft} onSubmit={submit} />
       ) : (
@@ -69,6 +71,28 @@ export function App(): React.ReactElement {
           </Box>
         </>
       )}
+    </Box>
+  );
+}
+
+function EnvironmentNoticePanel({
+  notices,
+}: {
+  notices: { key: string; message: string }[];
+}): React.ReactElement | null {
+  if (notices.length === 0) return null;
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <Box>
+        <Text color={palette.warn}>{symbols.diamond}</Text>
+        <Text color={palette.muted}> env</Text>
+      </Box>
+      {notices.map((notice) => (
+        <Box key={notice.key}>
+          <Text color={palette.faint}>{`  ${symbols.dot} `}</Text>
+          <Text color={palette.fgDim}>{notice.message}</Text>
+        </Box>
+      ))}
     </Box>
   );
 }
