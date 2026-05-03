@@ -11,10 +11,10 @@ import {
   riskReason,
 } from "@zuno/chain/uniswap";
 import { isAddress } from "viem";
-import { makeLogger } from "../shared/log.js";
+import { makeLogger } from "../agents/shared/log.js";
 import { createTelegramNotifier } from "./notifier.js";
 
-const log = makeLogger("watcher");
+const log = makeLogger("monitor");
 const alertStore = defaultAlertStore();
 const notifier = createTelegramNotifier();
 

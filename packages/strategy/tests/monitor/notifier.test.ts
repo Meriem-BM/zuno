@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { Address, PositionAlert } from "@zuno/core";
-import { createTelegramNotifier, formatTelegramAlert } from "../../src/agents/monitor/notifier.js";
+import { createTelegramNotifier, formatTelegramAlert } from "../../src/monitor/notifier.js";
 
 const alert: PositionAlert = {
   id: "alert_test",
@@ -38,7 +38,7 @@ describe("Telegram monitor notifier", () => {
         chatId: "1234",
         apiBaseUrl: "https://telegram.test",
       },
-      fetchImpl: async (url, init) => {
+      fetchImpl: async (url: string | URL | Request, init?: RequestInit) => {
         calls.push({ url: String(url), init: init ?? {} });
         return new Response(JSON.stringify({ ok: true }), { status: 200 });
       },

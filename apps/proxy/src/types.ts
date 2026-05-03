@@ -3,8 +3,6 @@ export interface Env {
   TURNKEY_ORGANIZATION_ID: string;
   TURNKEY_API_PUBLIC_KEY: string;
   TURNKEY_API_PRIVATE_KEY: string;
-  // Comma-separated list of allowed CLI version prefixes ("0.", "1.")
-  ZUNO_ALLOWED_CLIENTS?: string;
 }
 
 export interface SubOrgInfo {

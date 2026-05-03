@@ -9,7 +9,7 @@ POST /auth/login      { email, verificationToken, publicKey }    → { session, 
                                                                      walletId, walletAddress }
 ```
 
-After `/auth/login`, the CLI uses the session keys it derived locally to talk to Turnkey directly — the proxy is out of the path.
+After `/auth/login`, the CLI uses the session keys it derived locally to talk to Turnkey directly - the proxy is out of the path.
 
 ## Deploy (Cloudflare Workers)
 
@@ -38,6 +38,6 @@ For local secrets, drop them in `apps/proxy/.dev.vars` (gitignored). Same `KEY=v
 
 ## Threat model
 
-Turnkey's architecture gives a parent organization **read-only** access to its sub-organizations by default — parents can observe but not sign on a user's behalf. Each user's wallet is gated by their own session API key, derived locally during `/auth/login` and never seen by the proxy.
+Turnkey's architecture gives a parent organization **read-only** access to its sub-organizations by default - parents can observe but not sign on a user's behalf. Each user's wallet is gated by their own session API key, derived locally during `/auth/login` and never seen by the proxy.
 
-The parent-org private key only lives on the proxy host, set via `wrangler secret` (or as host env vars for the Node deployment). Compromise of that key would let an attacker bootstrap new sub-orgs, but **not** sign for existing users — their session keys are out of reach.
+The parent-org private key only lives on the proxy host, set via `wrangler secret` (or as host env vars for the Node deployment). Compromise of that key would let an attacker bootstrap new sub-orgs, but **not** sign for existing users - their session keys are out of reach.
