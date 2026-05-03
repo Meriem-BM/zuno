@@ -248,16 +248,17 @@ function prepFor(
   const shortfall1 = amount1 > heldByCapital1 ? amount1 - heldByCapital1 : 0n;
   const needsSwap = shortfall0 > 0n || shortfall1 > 0n;
 
+  // Only surface a prep step for a clear cross-token swap. The speculative
+  // "acquire additional X" fallback fired on float roundoff; the authoritative
+  // balance check now lives in prepareCreateApply at apply time.
   let prepAction: string | undefined;
   if (needsSwap) {
-    if (shortfall1 > 0n && capitalToken === "token0") {
+    if (shortfall1 > 0n && capitalToken === "token0" && amount0 > heldByCapital0) {
       const amountInDecimal = formatAtomic(amount0 - heldByCapital0, pool.token0.decimals);
       prepAction = `swap ~${amountInDecimal} ${pool.token0.symbol} → ${pool.token1.symbol} first to cover the range`;
-    } else if (shortfall0 > 0n && capitalToken === "token1") {
+    } else if (shortfall0 > 0n && capitalToken === "token1" && amount1 > heldByCapital1) {
       const amountInDecimal = formatAtomic(amount1 - heldByCapital1, pool.token1.decimals);
       prepAction = `swap ~${amountInDecimal} ${pool.token1.symbol} → ${pool.token0.symbol} first to cover the range`;
-    } else {
-      prepAction = `acquire additional ${shortfall0 > 0n ? pool.token0.symbol : pool.token1.symbol} before mint`;
     }
   }
 

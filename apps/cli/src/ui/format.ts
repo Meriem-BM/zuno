@@ -48,6 +48,17 @@ function formatAtomic(amount: string | undefined, decimals = 18, symbol = ""): s
   }
 }
 
+// The yield formula is mainnet-calibrated; testnet liquidity scales make it
+// produce ~0 or millions. Returns null to hide the row in those cases.
+const PLAUSIBLE_YIELD_MAX_USD_24H = 100_000;
+function formatYield(yieldUsd: number): string | null {
+  if (!Number.isFinite(yieldUsd) || yieldUsd <= 0) return null;
+  if (yieldUsd > PLAUSIBLE_YIELD_MAX_USD_24H) {
+    return "(estimate suppressed — testnet liquidity is out of formula range)";
+  }
+  return `~$${yieldUsd.toFixed(2)} / 24h (estimate)`;
+}
+
 export function formatResultData(result: ToolExecutionResult): Field[] {
   if (!result.data) return [];
   const data = result.data;
@@ -57,7 +68,8 @@ export function formatResultData(result: ToolExecutionResult): Field[] {
     case "showAgentWallet": {
       const d = data as AgentWalletData;
       return [
-        { key: "zuno", value: `${shortAddr(d.agentWalletAddress)} on ${d.chainName}` },
+        { key: "address", value: d.agentWalletAddress },
+        { key: "chain", value: d.chainName },
         { key: "provider", value: "turnkey" },
         { key: "status", value: d.status },
         ...(d.walletId ? [{ key: "walletId", value: d.walletId }] : []),
@@ -477,15 +489,28 @@ export function formatResultData(result: ToolExecutionResult): Field[] {
           value: `${s.pool.token0.symbol}/${s.pool.token1.symbol}  ${(s.pool.feeTier / 10_000).toFixed(2)}%`,
         },
         { key: "chain", value: s.chainName },
-        { key: "range", value: `${s.priceLower.toFixed(4)} → ${s.priceUpper.toFixed(4)}` },
+        {
+          key: "range",
+          value: `${s.priceLower.toFixed(4)} → ${s.priceUpper.toFixed(4)}    (current ${s.priceCurrent.toFixed(4)})`,
+        },
+        { key: "status", value: s.rangeStatus },
+      ];
+      const yieldDisplay = formatYield(s.expectedYield24hUsd);
+      if (yieldDisplay !== null) fields.push({ key: "yield", value: yieldDisplay });
+      fields.push(
+        { key: "profile", value: s.riskProfile },
         {
           key: "deposit",
           value: `${formatAtomic(s.amount0, s.pool.token0.decimals, s.pool.token0.symbol)} / ${formatAtomic(s.amount1, s.pool.token1.decimals, s.pool.token1.symbol)}`,
         },
-        { key: "max", value: `${formatAtomic(s.amount0Max, s.pool.token0.decimals, s.pool.token0.symbol)} / ${formatAtomic(s.amount1Max, s.pool.token1.decimals, s.pool.token1.symbol)}` },
-      ];
+        {
+          key: "slippage",
+          value: `+1% cap (≤${formatAtomic(s.amount0Max, s.pool.token0.decimals, s.pool.token0.symbol)} / ≤${formatAtomic(s.amount1Max, s.pool.token1.decimals, s.pool.token1.symbol)})`,
+        },
+      );
       if (s.prepAction) fields.push({ key: "prep", value: s.prepAction });
-      fields.push({ key: "goal", value: s.goalSummary });
+      if (s.poolReason) fields.push({ key: "why", value: s.poolReason });
+      fields.push({ key: "verdict", value: s.goalSummary });
       for (const note of s.notes) fields.push({ key: "·", value: note });
       return fields;
     }

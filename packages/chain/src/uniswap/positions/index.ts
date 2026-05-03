@@ -20,6 +20,7 @@ import { distanceFromBoundary, inRange, tickToPrice, utilization } from "../math
 export * from "./types.js";
 export {
   buildPoolKey,
+  liquidityForAmounts,
   poolIdFor,
   publicClient,
   type PoolKey,

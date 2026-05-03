@@ -1,4 +1,4 @@
-import type { SessionState } from "@zuno/core";
+import type { AgentThought, SessionState } from "@zuno/core";
 import {
   parseIntent,
   type Intent,
@@ -27,6 +27,7 @@ export interface RunIntentOptions {
   planStore?: ExecutionContext["planStore"];
   alertStore?: ExecutionContext["alertStore"];
   walletService?: ExecutionContext["walletService"];
+  onAgentThought?: (thought: AgentThought) => void;
 }
 
 export async function runIntent(
@@ -57,6 +58,7 @@ export async function executeParsed(
     planStore: options.planStore,
     alertStore: options.alertStore,
     walletService: options.walletService,
+    onAgentThought: options.onAgentThought,
   });
   return { intent, result: outcome.result, session: outcome.session };
 }

@@ -1,6 +1,6 @@
 import type { Intent } from "@zuno/strategy/intents";
 import type { ToolExecutionResult } from "@zuno/runtime";
-import type { SessionState } from "@zuno/core";
+import type { AgentThought, SessionState } from "@zuno/core";
 
 export interface Turn {
   id: number;
@@ -16,6 +16,7 @@ export interface Shell {
   pending: string | null;
   fallbackActive: boolean;
   fallbackProvider: string | null;
+  thoughts: AgentThought[];
   auth: AuthFlowState | null;
   setDraft: (value: string) => void;
   submit: (value: string) => void;

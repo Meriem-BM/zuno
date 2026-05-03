@@ -1,4 +1,4 @@
-import { prepareApply, simulatePlan as simulateStoredPlan } from "@zuno/execution";
+import { prepareApply, prepareCreateApply, simulatePlan as simulateStoredPlan } from "@zuno/execution";
 import type { Hex, Plan, PreparedActionRecord } from "@zuno/core";
 import { buildPlanDiff } from "@zuno/strategy/planner";
 import type {
@@ -19,6 +19,7 @@ import {
   resolvePlanId,
   walletService,
 } from "../shared.js";
+import { describeMintAmounts } from "../wallet/index.js";
 
 const showPlanDiff: ToolDefinition = {
   name: "showPlanDiff",
@@ -121,7 +122,7 @@ const approvePlan: ToolDefinition<ApprovePlanData> = {
           agentWalletAddress: target.address,
           approvalState: "approved",
           executionState: "approved",
-          summary: `mint ${summary.amount0} ${summary.pool.token0.symbol} + ${summary.amount1} ${summary.pool.token1.symbol}`,
+          summary: `mint ${describeMintAmounts(summary)}`,
           warnings: summary.notes,
           verdict: "approve",
           confidence: 1,
@@ -230,6 +231,15 @@ const applyPlan: ToolDefinition<ApplyPlanData> = {
           "No executable mint transaction was prepared.",
         );
       }
+      // Mirror the rebalance gate: balance + Permit2 readiness before signing.
+      const readiness = await prepareCreateApply(action.record, target.address);
+      if (readiness.status === "blocked") {
+        return err(
+          "applyPlan",
+          "EXECUTION_NOT_AVAILABLE",
+          readiness.warnings.join(" "),
+        );
+      }
       try {
         const signed = await walletService(ctx).signAndSubmit({
           from: tx.from ?? target.address,
@@ -248,7 +258,7 @@ const applyPlan: ToolDefinition<ApplyPlanData> = {
           approvalState: "approved",
           executionState: "submitted",
           status: "submitted",
-          summary: `mint ${summary.amount0} ${summary.pool.token0.symbol} + ${summary.amount1} ${summary.pool.token1.symbol} on ${summary.pool.token0.symbol}/${summary.pool.token1.symbol} ${(summary.pool.feeTier / 10_000).toFixed(2)}%`,
+          summary: `mint ${describeMintAmounts(summary)} on ${summary.pool.token0.symbol}/${summary.pool.token1.symbol} ${(summary.pool.feeTier / 10_000).toFixed(2)}%`,
           pair: `${summary.pool.token0.symbol}/${summary.pool.token1.symbol}`,
           feeTier: summary.pool.feeTier,
           oldRange: { priceLower: 0, priceUpper: 0 },

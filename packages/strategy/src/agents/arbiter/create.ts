@@ -107,12 +107,14 @@ function deterministicCreateArbiter(
     winner.score >= 3 ? "approve" : winner.score < 0 ? "reject" : "approve_with_caution";
   const confidence =
     winner.score >= 3 && winner.buffer >= 36 ? 0.85 : winner.score >= 1 ? 0.65 : 0.45;
-  return {
-    chosenIndex: winner.index,
-    rationale: `deterministic tiebreak: candidate [${winner.index}] best score (${winner.score}) and 2× buffer ${winner.buffer.toFixed(0)}h under ${riskProfile} profile.`,
-    verdict,
-    confidence,
-  };
+  const buffer = winner.buffer.toFixed(0);
+  const rationale =
+    winner.score >= 3
+      ? `Cleared the ${riskProfile} stress floor with a ${buffer}h volatility buffer.`
+      : winner.score < 0
+        ? `All candidates failed the ${riskProfile} stress floor; closest had a ${buffer}h buffer.`
+        : `Best of ${judgments.length} candidates — ${buffer}h volatility buffer under ${riskProfile} profile. No candidate fully cleared the Critic floor; Arbiter tiebreak.`;
+  return { chosenIndex: winner.index, rationale, verdict, confidence };
 }
 
 function createCandidateAsLegacy(c: CreateCandidate): PlanCandidate {
@@ -133,6 +135,7 @@ function createCandidateAsLegacy(c: CreateCandidate): PlanCandidate {
     slippageBps: 50,
     prepAction: c.prepAction,
     rationale: c.rationale,
+    expectedYield24hUsd: c.expectedYield24hUsd,
   };
 }
 

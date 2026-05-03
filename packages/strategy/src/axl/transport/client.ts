@@ -61,9 +61,23 @@ export class AxlClient {
     const res = await fetch(`${this.apiUrl}/topology`);
     if (!res.ok) throw new Error(`AXL topology failed: ${res.status}`);
     const data = (await res.json()) as { our_public_key?: string; peers?: unknown };
+    const peers = Array.isArray(data.peers)
+      ? Array.from(
+          new Set(
+            data.peers.flatMap((p) => {
+              if (typeof p === "string") return [p];
+              if (p && typeof p === "object") {
+                const key = (p as { public_key?: unknown }).public_key;
+                if (typeof key === "string") return [key];
+              }
+              return [];
+            }),
+          ),
+        )
+      : [];
     return {
       ourPublicKey: typeof data.our_public_key === "string" ? data.our_public_key : "",
-      peers: Array.isArray(data.peers) ? (data.peers as string[]) : [],
+      peers,
     };
   }
 

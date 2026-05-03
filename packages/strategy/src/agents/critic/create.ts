@@ -16,6 +16,7 @@ import {
   GAS_YIELD_CEILING,
 } from "../shared/lib/constants.js";
 import { formatHours, formatRatio } from "../shared/lib/format.js";
+import { enforceCriticFloor } from "../shared/lib/critic-floor.js";
 import { stressProfile, type StressProfile } from "../shared/lib/stress.js";
 import { gasYieldRatio } from "../shared/lib/yield.js";
 import { rebalanceCostUsd } from "../shared/lib/gas.js";
@@ -73,14 +74,13 @@ export async function runCriticCreate({
       verdict: j.verdict,
       reason: j.reason,
       stressBufferHours: metrics.find((m) => m.index === j.index)?.stress.double,
-      suggestion: j.suggestion,
+      suggestion: j.suggestion ?? undefined,
     }));
-    result = {
-      proposal,
-      judgments,
-      decision: output.decision,
-      rationale: output.rationale,
-    };
+    result = enforceCriticFloor(
+      { proposal, judgments, decision: output.decision, rationale: output.rationale },
+      metrics,
+      riskProfile,
+    );
   } else {
     result = deterministicCreateCritique(proposal, metrics, riskProfile);
   }

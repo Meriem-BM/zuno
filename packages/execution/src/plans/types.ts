@@ -44,6 +44,12 @@ export interface ApprovalReadiness {
   reason?: string;
 }
 
+export interface CreateApplyReadiness {
+  status: "ready" | "blocked";
+  warnings: string[];
+  readiness: ApprovalReadiness[];
+}
+
 export interface ApplyPreview {
   planId: string;
   positionId: string;

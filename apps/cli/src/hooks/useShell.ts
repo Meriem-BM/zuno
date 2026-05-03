@@ -1,5 +1,5 @@
 import { defaultChainId } from "@zuno/chain/config";
-import { createSession, type SessionState } from "@zuno/core";
+import { createSession, type AgentThought, type SessionState } from "@zuno/core";
 import {
   createModelFallback,
   parseIntent,
@@ -41,6 +41,14 @@ export function useShell(): Shell {
   const [auth, setAuth] = useState<AuthFlowState | null>(null);
   const [otpHandle, setOtpHandle] = useState<OtpHandle | null>(null);
   const [heldIntent, setHeldIntent] = useState<{ text: string; intent: Intent } | null>(null);
+  const [historyCursor, setHistoryCursor] = useState<number | null>(null);
+  const [stashedDraft, setStashedDraft] = useState("");
+  const [thoughts, setThoughts] = useState<AgentThought[]>([]);
+
+  const history = useMemo(
+    () => turns.map((t) => t.input).filter((s) => s.trim().length > 0),
+    [turns],
+  );
 
   const fallbackProvider = useMemo(() => configuredFallbackProvider(), []);
   const fallback = useMemo(() => {
@@ -72,7 +80,40 @@ export function useShell(): Shell {
   }, [session]);
 
   useInput((_, key) => {
-    if (key.escape) exit();
+    if (key.escape) {
+      exit();
+      return;
+    }
+    if (auth && auth.stage !== "done") return;
+    if (key.upArrow) {
+      if (history.length === 0) return;
+      const nextIndex = historyCursor === null ? history.length - 1 : historyCursor - 1;
+      const entry = history[nextIndex];
+      if (entry === undefined) return;
+      if (historyCursor === null) setStashedDraft(draft);
+      setHistoryCursor(nextIndex);
+      setDraft(entry);
+      return;
+    }
+    if (key.downArrow) {
+      if (historyCursor === null) return;
+      if (historyCursor >= history.length - 1) {
+        setHistoryCursor(null);
+        setDraft(stashedDraft);
+        setStashedDraft("");
+        return;
+      }
+      const nextIndex = historyCursor + 1;
+      const entry = history[nextIndex];
+      if (entry === undefined) return;
+      setHistoryCursor(nextIndex);
+      setDraft(entry);
+      return;
+    }
+    if (historyCursor !== null) {
+      setHistoryCursor(null);
+      setStashedDraft("");
+    }
   });
 
   const finishTurn = useCallback(
@@ -192,8 +233,11 @@ export function useShell(): Shell {
       const text = sanitizeInput(value);
       if (!text) return;
       setDraft("");
+      setHistoryCursor(null);
+      setStashedDraft("");
       setPending(text);
       setFallbackActive(false);
+      setThoughts([]);
 
       void (async () => {
         try {
@@ -212,6 +256,7 @@ export function useShell(): Shell {
           const run = await executeParsed(intent, session.get(), {
             tools: undefined,
             walletService: walletService ?? undefined,
+            onAgentThought: (t) => setThoughts((prev) => [...prev, t]),
           });
           finishTurn(text, run);
         } catch (e) {
@@ -241,6 +286,7 @@ export function useShell(): Shell {
     pending,
     fallbackActive,
     fallbackProvider,
+    thoughts,
     auth,
     setDraft,
     submit,

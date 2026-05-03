@@ -1,3 +1,4 @@
+import { formatUnits } from "viem";
 import type {
   ErrorCode,
   ExecutionContext,
@@ -93,4 +94,20 @@ export function needsConfirmation<TSummary, TData = NeedsConfirmationData<TSumma
   data: TData,
 ): ToolExecutionResult<TData> {
   return { tool, status: "needs_confirmation", message, data };
+}
+
+export function formatAmount(atomic: string, decimals: number): string {
+  if (!atomic) return "0";
+  let raw: bigint;
+  try {
+    raw = BigInt(atomic);
+  } catch {
+    return atomic;
+  }
+  if (raw === 0n) return "0";
+  const human = formatUnits(raw, decimals);
+  if (!human.includes(".")) return human;
+  const [whole, frac = ""] = human.split(".");
+  const trimmed = (frac + "000000").slice(0, 6);
+  return `${whole}.${trimmed}`;
 }

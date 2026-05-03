@@ -1,14 +1,4 @@
-import { AxlClient, AGENT_ROLES, peerIdFor } from "@zuno/strategy/axl";
-import type {
-  AgentThought,
-  AxlEnvelope,
-  ChainId,
-  FlowFailed,
-  FlowStart,
-  Plan,
-  PlanReady,
-} from "@zuno/core";
-import { newRequestId } from "@zuno/core";
+import type { AgentThought, ChainId, FlowStart, Plan } from "@zuno/core";
 import { agentsAvailable, runDebate } from "@zuno/strategy/agents";
 import {
   buildPlanDiff,
@@ -18,6 +8,7 @@ import {
 } from "@zuno/strategy/planner";
 import { buildSnapshot, getPosition } from "@zuno/chain/uniswap";
 import type { RecommendRebalanceData, ToolDefinition } from "../../contracts/types.js";
+import { attachTranscript, runMeshFlow } from "../lib/mesh.js";
 import {
   err,
   missingAgentWallet,
@@ -47,7 +38,7 @@ const recommendRebalance: ToolDefinition = {
     if (!target) return missingAgentWallet("recommendRebalance");
 
     try {
-      const plan = await produce(positionId, target.address, target.chainId);
+      const plan = await produce(positionId, target.address, target.chainId, ctx.onAgentThought);
       await planStore(ctx).save(plan);
       return ok(
         "recommendRebalance",
@@ -130,6 +121,7 @@ async function produce(
   positionId: string,
   owner: `0x${string}`,
   chainId: ChainId,
+  onAgentThought?: (thought: AgentThought) => void,
 ): Promise<Plan> {
   const start: FlowStart = {
     positionId,
@@ -139,12 +131,17 @@ async function produce(
   };
 
   // Path 1: real AXL mesh.
-  const meshPlan = await tryMesh(start);
+  const meshPlan = await runMeshFlow<FlowStart>({
+    kind: "flow_start",
+    payload: start,
+    deadlineMs: 60_000,
+    onAgentThought,
+  });
   if (meshPlan) return meshPlan;
 
   // Path 2: in-process LLM debate.
   if (agentsAvailable()) {
-    const result = await runDebate({ start });
+    const result = await runDebate({ start, onThought: onAgentThought });
     return attachTranscript(result.plan, result.ready.transcript);
   }
 
@@ -152,66 +149,6 @@ async function produce(
   const snapshot = buildSnapshot(await getPosition(positionId, { owner, chainId }));
   const riskContext = await loadRiskContext(snapshot);
   return recommendPlan(snapshot, riskContext);
-}
-
-async function tryMesh(start: FlowStart): Promise<Plan | null> {
-  let client: AxlClient;
-  try {
-    client = new AxlClient({ role: "cli", pollIntervalMs: 150 });
-    const topology = await client.topology();
-    const visible = new Set(topology.peers);
-    for (const role of AGENT_ROLES) {
-      if (!visible.has(peerIdFor(role))) return null;
-    }
-  } catch {
-    return null;
-  }
-
-  const requestId = newRequestId();
-  const env: AxlEnvelope<FlowStart> = {
-    requestId,
-    from: "cli",
-    to: "scout",
-    kind: "flow_start",
-    payload: start,
-    ts: Date.now(),
-  };
-  await client.send(env);
-
-  const transcript: AgentThought[] = [];
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    const inbox = await client.recv();
-    for (const msg of inbox) {
-      if (msg.requestId !== requestId) continue;
-      if (msg.kind === "agent_thought") {
-        transcript.push(msg.payload as AgentThought);
-        continue;
-      }
-      if (msg.kind === "plan_ready") {
-        const ready = msg.payload as PlanReady;
-        return attachTranscript(ready.plan, [...transcript, ...(ready.transcript ?? [])]);
-      }
-      if (msg.kind === "flow_failed") {
-        const f = msg.payload as FlowFailed;
-        throw new Error(`AXL flow failed at ${f.stage}: ${f.message}`);
-      }
-    }
-    await sleep(150);
-  }
-  throw new Error(`AXL recommendation timed out for ${start.positionId}`);
-}
-
-function attachTranscript(plan: Plan, transcript: AgentThought[]): Plan {
-  if (transcript.length === 0) return plan;
-  const lines = transcript.map((t) => `[${t.role}] ${t.text}`);
-  return {
-    ...plan,
-    risk: {
-      ...plan.risk,
-      reasons: [...plan.risk.reasons, ...lines],
-    },
-  };
 }
 
 function recommendationData(plan: Plan): RecommendRebalanceData {
@@ -261,10 +198,6 @@ function inferDecidedBy(reasons: readonly string[]): RecommendRebalanceData["dec
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // Re-exported just to keep an existing public surface that other code reads.

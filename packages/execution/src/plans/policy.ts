@@ -60,6 +60,16 @@ export async function checkApprovals(plan: Plan, owner: Address): Promise<Approv
 
   const results: ApprovalReadiness[] = [];
   for (const item of tokens) {
+    // Native ETH (currency address 0x0 in v4) needs no ERC20 allowance; the
+    // value flows via msg.value. Skip the allowance check entirely.
+    if (item.token.address === "0x0000000000000000000000000000000000000000") {
+      results.push({
+        tokenSymbol: item.token.symbol,
+        requiredWei: item.requiredWei.toString(),
+        sufficient: true,
+      });
+      continue;
+    }
     try {
       const reading = await checkApprovalRequirement(
         { token: item.token, owner, spender, chainId },

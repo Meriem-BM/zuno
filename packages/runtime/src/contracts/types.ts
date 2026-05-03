@@ -1,5 +1,6 @@
 import type {
   Address,
+  AgentThought,
   ApprovalState,
   ChainId,
   ExecutionState,
@@ -108,6 +109,8 @@ export interface ExecutionContext {
     checkChain?: boolean;
     checkAllowances?: boolean;
   };
+  // Streaming sink for live agent_thought envelopes from the four-agent debate.
+  onAgentThought?: (thought: AgentThought) => void;
 }
 
 export interface ExecutorOutcome {
@@ -259,12 +262,17 @@ export interface CreatePositionPreparedActionSummary {
   tickUpper: number;
   priceLower: number;
   priceUpper: number;
+  priceCurrent: number;
+  inRange: boolean;
+  rangeStatus: string;
   // Atomic units the user is depositing on each side.
   amount0: string;
   amount1: string;
   expectedYield24hUsd: number;
   prepAction?: string;
   goalSummary: string;
+  poolReason?: string;
+  riskProfile: "conservative" | "balanced" | "aggressive";
   /**
    * Max amounts the user is willing to spend (capital + 1% slippage buffer).
    * The mint will revert if the actual amounts required exceed these.

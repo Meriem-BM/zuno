@@ -44,21 +44,50 @@ export async function runAgent<S extends z.ZodTypeAny>(
   const model = opts.model ?? process.env.ZUNO_AGENT_MODEL ?? "gpt-4o-mini";
   const temperature = opts.temperature ?? 0.4;
 
-  const completion = await client.beta.chat.completions.parse({
-    model,
-    temperature,
-    messages: [
-      { role: "system", content: opts.system },
-      { role: "user", content: opts.user },
-    ],
-    response_format: zodResponseFormat(opts.schema, opts.schemaName),
-  });
+  // Schemas render under 2KB; 4000 is plenty and bounds runaway generation.
+  const MAX_TOKENS = 4000;
+
+  const attempt = async (attemptTemperature: number) =>
+    client.beta.chat.completions.parse({
+      model,
+      temperature: attemptTemperature,
+      max_tokens: MAX_TOKENS,
+      messages: [
+        { role: "system", content: opts.system },
+        { role: "user", content: opts.user },
+      ],
+      response_format: zodResponseFormat(opts.schema, opts.schemaName),
+    });
+
+  // gpt-4o-mini occasionally hits the output cap on first try; retry once
+  // at temperature 0 to nudge it toward a more compact response.
+  let completion;
+  try {
+    completion = await attempt(temperature);
+  } catch (e) {
+    if (isLengthError(e)) {
+      completion = await attempt(0);
+    } else {
+      throw e;
+    }
+  }
 
   const choice = completion.choices[0];
   if (!choice?.message.parsed) {
-    throw new Error(`Agent ${opts.schemaName} returned no parsed output (model=${model}).`);
+    const reason = choice?.finish_reason ?? "unknown";
+    throw new Error(
+      `Agent ${opts.schemaName} returned no parsed output (model=${model}, finish=${reason}).`,
+    );
   }
   return { output: choice.message.parsed, id: completion.id };
+}
+
+function isLengthError(e: unknown): boolean {
+  if (e instanceof Error) {
+    if (e.name === "LengthFinishReasonError") return true;
+    if (e.message.toLowerCase().includes("length limit")) return true;
+  }
+  return false;
 }
 
 export function agentsAvailable(): boolean {

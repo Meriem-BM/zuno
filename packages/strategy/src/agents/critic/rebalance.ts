@@ -12,6 +12,7 @@ import {
   ETH_PRICE_USD_FALLBACK,
   GAS_YIELD_CEILING,
 } from "../shared/lib/constants.js";
+import { enforceCriticFloor } from "../shared/lib/critic-floor.js";
 import { formatHours, formatRatio } from "../shared/lib/format.js";
 import { stressProfile, type StressProfile } from "../shared/lib/stress.js";
 import { estimate24hFeeYield, gasYieldRatio } from "../shared/lib/yield.js";
@@ -71,14 +72,13 @@ export async function runCritic({
       verdict: j.verdict,
       reason: j.reason,
       stressBufferHours: metrics.find((m) => m.index === j.index)?.stress.double,
-      suggestion: j.suggestion,
+      suggestion: j.suggestion ?? undefined,
     }));
-    result = {
-      proposal,
-      judgments,
-      decision: output.decision,
-      rationale: output.rationale,
-    };
+    result = enforceCriticFloor(
+      { proposal, judgments, decision: output.decision, rationale: output.rationale },
+      metrics,
+      riskProfile,
+    );
   } else {
     result = deterministicCritique(proposal, metrics, riskProfile);
   }
@@ -204,8 +204,8 @@ export const CriticSchema = z.object({
         suggestion: z
           .string()
           .max(220)
-          .optional()
-          .describe("Concrete change for the strategist if verdict is 'revise'."),
+          .nullable()
+          .describe("Concrete change for the strategist if verdict is 'revise', else null."),
       }),
     )
     .min(1),

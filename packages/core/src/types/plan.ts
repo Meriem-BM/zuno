@@ -19,6 +19,7 @@ export interface PlanCandidate {
   slippageBps?: number;
   prepAction?: string;
   rationale: string;
+  expectedYield24hUsd?: number;
 }
 
 export type RiskVerdict = "approve" | "reject" | "approve_with_caution";

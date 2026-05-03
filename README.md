@@ -147,7 +147,7 @@ If `OPENAI_API_KEY` is also unset (or `ZUNO_DETERMINISTIC=true`), the rebalance 
 
 ## Sign-in
 
-The first wallet-bearing intent (`create my zuno wallet`, `inspect my positions`, …) opens a side flow that asks for your email and a one-time code Turnkey emails you. On success the CLI bootstraps a Turnkey **sub-organization** for your email (with its own Ethereum wallet) and saves a 1-hour session at `~/.zuno/session.json` (mode 0600). Subsequent intents pick that session up automatically; once it expires the side flow reopens.
+The first wallet-bearing intent (`create my zuno wallet`, `inspect my positions`, …) opens a side flow that asks for your email and a one-time code Turnkey emails you. On success the CLI bootstraps a Turnkey **sub-organization** for your email (with its own Ethereum wallet) and saves a 3-hour session at `~/.zuno/session.json` (mode 0600). Subsequent intents pick that session up automatically; once it expires the side flow reopens.
 
 The parent-org credentials in `.env` are used only to send the OTP and create the sub-org. Turnkey's architecture gives the parent **read-only** access to sub-org wallets; every signature comes from your own session keys, not the parent org.
 

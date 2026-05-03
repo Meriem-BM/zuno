@@ -13,7 +13,7 @@ const WORDMARK = ["▀▀▀█ █  █ █▄ █ █▀▀█", " ▄▀  █
 
 function Wordmark(): React.ReactElement {
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" marginLeft={2}>
       {WORDMARK.map((row, idx) => (
         <Text key={idx} color={palette.accent}>
           {row}

@@ -33,12 +33,21 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/tooling/axl"
 mkdir -p "$OUT"
 
+ENTRIES=(
+  "cli 9002 7000 9501"
+  "scout 9012 7000 9511"
+  "strategist 9022 7000 9521"
+  "critic 9032 7000 9531"
+  "arbiter 9042 7000 9541"
+)
+
 env_block=()
-for entry in "cli 9002 7001" "scout 9012 7011" "strategist 9022 7021" "critic 9032 7031" "arbiter 9042 7041"; do
+for entry in "${ENTRIES[@]}"; do
   set -- $entry
   role=$1
   api_port=$2
   tcp_port=$3
+  ygg_port=$4
   pem="$OUT/$role.pem"
   cfg="$OUT/$role-config.json"
 
@@ -49,11 +58,22 @@ for entry in "cli 9002 7001" "scout 9012 7011" "strategist 9022 7021" "critic 90
   pubhex=$("$OPENSSL" pkey -in "$pem" -pubout -outform DER \
     | tail -c 32 | xxd -p -c 64)
 
+  peers_json=""
+  for other in "${ENTRIES[@]}"; do
+    set -- $other
+    other_role=$1
+    other_ygg=$4
+    if [[ "$other_role" != "$role" ]]; then
+      [[ -n "$peers_json" ]] && peers_json+=", "
+      peers_json+="\"tls://127.0.0.1:$other_ygg\""
+    fi
+  done
+
   cat >"$cfg" <<JSON
 {
   "PrivateKeyPath": "$pem",
-  "Peers": [],
-  "Listen": [],
+  "Peers": [$peers_json],
+  "Listen": ["tls://127.0.0.1:$ygg_port"],
   "api_port": $api_port,
   "tcp_port": $tcp_port
 }

@@ -1,17 +1,8 @@
 import { chainName, defaultChainId } from "@zuno/chain/config";
 import type { AgentWallet } from "@zuno/chain/wallet";
-import { buildMint, listPositions, pairName } from "@zuno/chain/uniswap";
-import type {
-  AgentThought,
-  AxlEnvelope,
-  ChainId,
-  CreateStart,
-  FlowFailed,
-  Plan,
-  PlanReady,
-} from "@zuno/core";
-import { newPreparedActionId, newRequestId } from "@zuno/core";
-import { AGENT_ROLES, AxlClient, peerIdFor } from "@zuno/strategy/axl";
+import { buildMint, listPositions, liquidityForAmounts, pairName } from "@zuno/chain/uniswap";
+import type { AgentThought, ChainId, CreateStart, Plan } from "@zuno/core";
+import { newPreparedActionId } from "@zuno/core";
 import { agentsAvailable, runDebateCreate } from "@zuno/strategy/agents";
 import type {
   CreatePositionPreparedActionSummary,
@@ -20,8 +11,10 @@ import type {
   ToolDefinition,
   ToolExecutionResult,
 } from "../../contracts/types.js";
+import { attachTranscript, runMeshFlow } from "../lib/mesh.js";
 import {
   err,
+  formatAmount,
   missingAgentWallet,
   needsConfirmation,
   ok,
@@ -155,9 +148,16 @@ const createPosition: ToolDefinition = {
     };
 
     try {
-      const plan = await produceCreate(start, target.chainId);
-      // Build the mint calldata + prepared action.
-      const summary = buildCreateSummary(plan, target.chainId);
+      const plan = await produceCreate(start, target.chainId, ctx.onAgentThought);
+      if (plan.risk.verdict === "reject") {
+        const reason = plan.risk.reasons[0] ?? "All candidates failed the risk floor.";
+        return err(
+          "createPosition",
+          "INTENT_NOT_ACTIONABLE",
+          `${reason} Try a less conservative profile (e.g. "balanced"), a different chain with deeper pools, or a smaller capital amount.`,
+        );
+      }
+      const summary = buildCreateSummary(plan, target.chainId, goal.riskProfile ?? "balanced");
       const tx = buildMintFromPlan(plan, target.address, target.chainId);
       const preparedAction: PreparedAction<CreatePositionPreparedActionSummary> = {
         id: newPreparedActionId(),
@@ -187,9 +187,10 @@ const createPosition: ToolDefinition = {
       } catch {
         // prepared-action store optional in tests
       }
+      const mintAmounts = describeMintAmounts(summary);
       const data: NeedsConfirmationData<CreatePositionPreparedActionSummary> = {
         preparedAction,
-        prompt: `Mint ${summary.amount0} ${summary.pool.token0.symbol} + ${summary.amount1} ${summary.pool.token1.symbol} on ${summary.pool.token0.symbol}/${summary.pool.token1.symbol} ${(summary.pool.feeTier / 10_000).toFixed(2)}%? Type "approve it" to sign.`,
+        prompt: `Mint ${mintAmounts} on ${summary.pool.token0.symbol}/${summary.pool.token1.symbol} ${(summary.pool.feeTier / 10_000).toFixed(2)}%? Type "approve it" to sign.`,
       };
       return needsConfirmation<CreatePositionPreparedActionSummary>(
         "createPosition",
@@ -205,11 +206,20 @@ const createPosition: ToolDefinition = {
 // AXL first, then in-process orchestrator. No deterministic fallback for
 // create: without a goal-driven proposal there's nothing meaningful to
 // emit, so we surface a clear error instead.
-async function produceCreate(start: CreateStart, chainId: ChainId): Promise<Plan> {
-  const meshPlan = await tryMeshCreate(start, chainId);
+async function produceCreate(
+  start: CreateStart,
+  chainId: ChainId,
+  onAgentThought?: (thought: AgentThought) => void,
+): Promise<Plan> {
+  const meshPlan = await runMeshFlow<CreateStart>({
+    kind: "flow_create_start",
+    payload: { ...start, owner: start.owner, goal: { ...start.goal, chain: chainId } },
+    deadlineMs: 90_000,
+    onAgentThought,
+  });
   if (meshPlan) return meshPlan;
   if (agentsAvailable() || process.env.ZUNO_DETERMINISTIC === "true") {
-    const result = await runDebateCreate({ start, chainId });
+    const result = await runDebateCreate({ start, chainId, onThought: onAgentThought });
     return attachTranscript(result.plan, result.ready.transcript);
   }
   throw new Error(
@@ -217,69 +227,71 @@ async function produceCreate(start: CreateStart, chainId: ChainId): Promise<Plan
   );
 }
 
-async function tryMeshCreate(start: CreateStart, chainId: ChainId): Promise<Plan | null> {
-  let client: AxlClient;
+// Strategist's expectedYield24hUsd is pool-level; scale by userL/(userL+poolL)
+// so the user-facing number corresponds to the actual deposit, not the pool.
+function scaleYieldToUserShare(
+  plan: Plan,
+  pool: { liquidity: string; currentTick: number; token0: { decimals: number }; token1: { decimals: number } },
+): number {
+  const poolYieldUsd = plan.recommended.expectedYield24hUsd ?? 0;
+  if (poolYieldUsd <= 0) return 0;
+  let poolL: bigint;
   try {
-    client = new AxlClient({ role: "cli", pollIntervalMs: 150 });
-    const topology = await client.topology();
-    const visible = new Set(topology.peers);
-    for (const role of AGENT_ROLES) {
-      if (!visible.has(peerIdFor(role))) return null;
-    }
+    poolL = BigInt(pool.liquidity || "0");
   } catch {
-    return null;
+    poolL = 0n;
   }
-  const requestId = newRequestId();
-  const env: AxlEnvelope<CreateStart> = {
-    requestId,
-    from: "cli",
-    to: "scout",
-    kind: "flow_create_start",
-    payload: { ...start, owner: start.owner, goal: { ...start.goal, chain: chainId } },
-    ts: Date.now(),
-  };
-  await client.send(env);
-
-  const transcript: AgentThought[] = [];
-  const deadline = Date.now() + 90_000;
-  while (Date.now() < deadline) {
-    const inbox = await client.recv();
-    for (const msg of inbox) {
-      if (msg.requestId !== requestId) continue;
-      if (msg.kind === "agent_thought") {
-        transcript.push(msg.payload as AgentThought);
-        continue;
-      }
-      if (msg.kind === "plan_ready") {
-        const ready = msg.payload as PlanReady;
-        return attachTranscript(ready.plan, [...transcript, ...(ready.transcript ?? [])]);
-      }
-      if (msg.kind === "flow_failed") {
-        const f = msg.payload as FlowFailed;
-        throw new Error(`AXL create flow failed at ${f.stage}: ${f.message}`);
-      }
-    }
-    await sleep(150);
-  }
-  throw new Error("AXL create flow timed out");
+  const userL = liquidityForAmounts(
+    plan.recommended.deploy0,
+    plan.recommended.deploy1,
+    pool.currentTick,
+    plan.recommended.tickLower,
+    plan.recommended.tickUpper,
+    pool.token0.decimals,
+    pool.token1.decimals,
+  );
+  if (userL <= 0n || poolL <= 0n) return 0;
+  const totalL = userL + poolL;
+  const ratio = Number((userL * 1_000_000n) / totalL) / 1_000_000;
+  return poolYieldUsd * ratio;
 }
 
-function attachTranscript(plan: Plan, transcript: AgentThought[]): Plan {
-  if (transcript.length === 0) return plan;
-  const lines = transcript.map((t) => `[${t.role}] ${t.text}`);
-  return { ...plan, risk: { ...plan.risk, reasons: [...plan.risk.reasons, ...lines] } };
+export function describeMintAmounts(summary: CreatePositionPreparedActionSummary): string {
+  const human0 = formatAmount(summary.amount0, summary.pool.token0.decimals);
+  const human1 = formatAmount(summary.amount1, summary.pool.token1.decimals);
+  const left = human0 !== "0";
+  const right = human1 !== "0";
+  if (left && right) {
+    return `${human0} ${summary.pool.token0.symbol} + ${human1} ${summary.pool.token1.symbol}`;
+  }
+  if (left) return `${human0} ${summary.pool.token0.symbol} (single-sided)`;
+  if (right) return `${human1} ${summary.pool.token1.symbol} (single-sided)`;
+  return `0 ${summary.pool.token0.symbol}`;
 }
 
-function buildCreateSummary(plan: Plan, chainId: ChainId): CreatePositionPreparedActionSummary {
+function buildCreateSummary(
+  plan: Plan,
+  chainId: ChainId,
+  riskProfile: "conservative" | "balanced" | "aggressive",
+): CreatePositionPreparedActionSummary {
   const pool = plan.snapshot.position.pool;
   // Slippage buffer: cap at deposit + 1% so the chain reverts if real
   // amounts come back materially higher (e.g. tick rounding plus drift).
   const amount0Max = withSlippage(plan.recommended.deploy0, 100);
   const amount1Max = withSlippage(plan.recommended.deploy1, 100);
   const goalSummary = plan.risk.reasons[0] ?? "agent debate concluded";
-  const notes: string[] = [];
-  if (plan.recommended.prepAction) notes.push(plan.recommended.prepAction);
-  notes.push(`debate decided by ${plan.risk.reasons.some((r) => r.startsWith("[arbiter]")) ? "arbiter" : "critic"}`);
+  const decidedBy = plan.risk.reasons.some((r) => r.startsWith("[arbiter]"))
+    ? "arbiter"
+    : "critic";
+  const priceCurrent = plan.snapshot.range.priceCurrent;
+  const inRange =
+    priceCurrent >= plan.recommended.priceLower && priceCurrent <= plan.recommended.priceUpper;
+  const rangeStatus = inRange
+    ? "active  (fees accrue now)"
+    : priceCurrent < plan.recommended.priceLower
+      ? "parked above current  (activates when price rises into range)"
+      : "parked below current  (activates when price falls into range)";
+  const userYield24hUsd = scaleYieldToUserShare(plan, pool);
   return {
     kind: "create_position",
     chainId,
@@ -295,14 +307,19 @@ function buildCreateSummary(plan: Plan, chainId: ChainId): CreatePositionPrepare
     tickUpper: plan.recommended.tickUpper,
     priceLower: plan.recommended.priceLower,
     priceUpper: plan.recommended.priceUpper,
+    priceCurrent,
+    inRange,
+    rangeStatus,
     amount0: plan.recommended.deploy0,
     amount1: plan.recommended.deploy1,
-    expectedYield24hUsd: 0,
+    expectedYield24hUsd: userYield24hUsd,
     prepAction: plan.recommended.prepAction,
     goalSummary,
+    poolReason: plan.recommended.rationale,
+    riskProfile,
     amount0Max,
     amount1Max,
-    notes,
+    notes: [`debate decided by ${decidedBy}`],
   };
 }
 
@@ -333,10 +350,6 @@ function withSlippage(atomicAmount: string, bps: number): string {
   } catch {
     return atomicAmount;
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 const listAgentWalletPositions: ToolDefinition = {

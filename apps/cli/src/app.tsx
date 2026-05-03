@@ -7,6 +7,8 @@ import { ApplyConfirmation } from "./shell/apply-confirmation.js";
 import { AuthFlow } from "./shell/auth-flow.js";
 import { ClarificationPanel, HelpPanel, ResultPanel } from "./shell/panels.js";
 import { WalletStatus } from "./shell/wallet-status.js";
+import { Spinner } from "./ui/spinner.js";
+import { LiveTranscript } from "./ui/transcript.js";
 import type { ScrollItem, Turn } from "./types/index.js";
 
 export function App(): React.ReactElement {
@@ -17,6 +19,7 @@ export function App(): React.ReactElement {
     pending,
     fallbackActive,
     fallbackProvider,
+    thoughts,
     auth,
     setDraft,
     submit,
@@ -50,11 +53,14 @@ export function App(): React.ReactElement {
       ) : (
         <>
           {pending ? (
-            <PendingLine
-              text={pending}
-              fallbackActive={fallbackActive}
-              provider={fallbackProvider}
-            />
+            <>
+              <PendingLine
+                text={pending}
+                fallbackActive={fallbackActive}
+                provider={fallbackProvider}
+              />
+              <LiveTranscript thoughts={thoughts} />
+            </>
           ) : null}
           <WalletStatus state={snapshot} />
           <Box marginTop={1}>
@@ -95,12 +101,7 @@ function PendingLine({
   provider: string | null;
 }): React.ReactElement {
   const message = fallbackActive ? aiFallbackMessage(provider) : pendingMessage(text);
-  return (
-    <Box marginTop={1}>
-      <Text color={palette.accent}>{symbols.diamond}</Text>
-      <Text color={palette.muted}>{` ${message}`}</Text>
-    </Box>
-  );
+  return <Spinner label={message} />;
 }
 
 function aiFallbackMessage(provider: string | null): string {

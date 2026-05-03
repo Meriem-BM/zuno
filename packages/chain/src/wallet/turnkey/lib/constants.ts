@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-export const SESSION_TTL_MS = 60 * 60 * 1000;
+export const SESSION_TTL_MS = 3 * 60 * 60 * 1000;
 
 export const SESSION_LENGTH_SECONDS = SESSION_TTL_MS / 1000;
 
